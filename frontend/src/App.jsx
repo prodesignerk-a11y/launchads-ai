@@ -614,7 +614,7 @@ Responda SOMENTE em JSON válido, sem texto extra, sem markdown:
   };
 
   const generateCopyVariations = async (guide) => {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("https://scintillating-nourishment-production-db0b.up.railway.app/api/claude", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
