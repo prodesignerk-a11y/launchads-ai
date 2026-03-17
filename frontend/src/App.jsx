@@ -1,20 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
 const style = `
-  @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Cabinet+Grotesk:wght@400;500;700;800&family=Playfair+Display:ital,wght@0,700;1,700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Cabinet+Grotesk:wght@400;500;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 
   :root {
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --surface2: #18181f;
-    --border: #2a2a35;
-    --accent: #ff5c28;
-    --accent2: #ff8c42;
-    --text: #f0f0f5;
-    --muted: #6b6b80;
-    --success: #22c55e;
+    --bg: #0a0a0f; --surface: #111118; --surface2: #18181f;
+    --border: #2a2a35; --accent: #ff5c28; --accent2: #ff8c42;
+    --text: #f0f0f5; --muted: #6b6b80; --success: #22c55e;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Cabinet Grotesk', sans-serif; min-height: 100vh; }
   .app { display: flex; min-height: 100vh; }
@@ -70,10 +63,10 @@ const style = `
   .format-item { background: var(--surface2); border: 2px solid var(--border); border-radius: 10px; padding: 12px 8px; cursor: pointer; text-align: center; transition: all .2s; font-size: 11px; font-weight: 700; }
   .format-item:hover { border-color: var(--accent); }
   .format-item.active { border-color: var(--accent); background: rgba(255,92,40,.1); color: var(--accent); }
-  .format-preview { margin: 0 auto 6px; border-radius: 3px; transition: background .2s; }
-  .format-item.active .format-preview { background: var(--accent) !important; }
+  .format-preview { margin: 0 auto 6px; border-radius: 3px; }
 
-  .style-tag { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; background: rgba(255,92,40,.1); color: var(--accent); border: 1px solid rgba(255,92,40,.2); margin-top: 10px; }
+  .style-detected { background: rgba(255,92,40,.06); border: 1px solid rgba(255,92,40,.2); border-radius: 10px; padding: 12px 14px; margin-top: 12px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .style-detected strong { color: var(--accent); display: block; margin-bottom: 4px; }
 
   .generate-bar { background: linear-gradient(135deg, var(--surface), rgba(255,92,40,.05)); border: 1px solid var(--border); border-radius: 14px; padding: 22px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; gap: 16px; }
   .generate-bar h3 { font-family: 'Clash Display', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 4px; }
@@ -82,15 +75,15 @@ const style = `
   .creatives-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
   .creative-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; transition: all .25s; }
   .creative-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,.5); }
-  .canvas-wrap { position: relative; background: #000; }
+  .canvas-wrap { position: relative; }
   .canvas-wrap canvas { display: block; width: 100%; height: auto; }
   .var-badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,.75); backdrop-filter: blur(6px); border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: white; }
   .creative-footer { padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); }
   .creative-name { font-size: 12px; font-weight: 700; }
-  .ctags { display: flex; gap: 5px; margin-top: 3px; }
+  .ctags { display: flex; gap: 5px; margin-top: 3px; flex-wrap: wrap; }
   .ctag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
   .cactions { display: flex; gap: 5px; }
-  .ibtn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 7px; cursor: pointer; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); transition: all .2s; font-size: 13px; }
+  .ibtn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 7px; cursor: pointer; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); transition: all .2s; }
   .ibtn:hover { color: var(--text); border-color: #555; }
   .ibtn.d:hover { color: #f87171; border-color: #f87171; }
 
@@ -109,74 +102,219 @@ const style = `
   .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
   .empty h3 { font-family: 'Clash Display', sans-serif; font-size: 18px; color: var(--text); margin-bottom: 8px; margin-top: 16px; }
-
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 `;
 
-// ─── CANVAS RENDERER ──────────────────────────────────────────────────────────
-const CANVAS_W = 400;
+const PROXY_URL = "https://scintillating-nourishment-production-db0b.up.railway.app";
+const CANVAS_W = 420;
 
-const THEMES = [
-  {
-    // Variação 1: Fundo escuro, texto claro — estilo editorial dark
-    name: "Dark Editorial",
-    getBg: () => "#0d0d0d",
-    getTextColor: () => "#ffffff",
-    getAccent: () => "#ff5c28",
-    getOverlay: (ctx, W, H) => {
-      const g = ctx.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, "rgba(0,0,0,0.1)");
-      g.addColorStop(0.4, "rgba(0,0,0,0.5)");
-      g.addColorStop(1, "rgba(0,0,0,0.95)");
-      return g;
-    },
-    layout: "bottom",
-  },
-  {
-    // Variação 2: Fundo claro, texto escuro — estilo clean editorial
-    name: "Clean Light",
-    getBg: (ref) => ref?.backgrounds?.[0] || "#f5f0e8",
-    getTextColor: () => "#111111",
-    getAccent: (ref) => ref?.accentColors?.[0] || "#1a1a1a",
-    getOverlay: (ctx, W, H) => {
-      const g = ctx.createLinearGradient(0, H * 0.3, 0, H);
-      g.addColorStop(0, "rgba(245,240,232,0)");
-      g.addColorStop(0.5, "rgba(245,240,232,0.7)");
-      g.addColorStop(1, "rgba(245,240,232,0.98)");
-      return g;
-    },
-    layout: "bottom",
-  },
-  {
-    // Variação 3: Cor de destaque, alto contraste
-    name: "Bold Color",
-    getBg: (ref) => ref?.backgrounds?.[1] || "#1a1a2e",
-    getTextColor: () => "#ffffff",
-    getAccent: () => "#f5c518",
-    getOverlay: (ctx, W, H) => {
-      const g = ctx.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, "rgba(0,0,0,0)");
-      g.addColorStop(0.5, "rgba(0,0,0,0.6)");
-      g.addColorStop(1, "rgba(0,0,0,0.97)");
-      return g;
-    },
-    layout: "bottom",
-  },
-];
+// ─── CANVAS ENGINE ────────────────────────────────────────────────────────────
+function drawCreative(canvas, data, variationIndex, styleGuide) {
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width;
+  const H = canvas.height;
+  const PAD = W * 0.07;
 
-function fitFontSize(ctx, text, fontBase, maxWidth, maxSize, minSize) {
-  let size = maxSize;
-  while (size > minSize) {
-    ctx.font = `${fontBase.replace("SIZE", size)}`;
-    if (ctx.measureText(text).width <= maxWidth) break;
-    size -= 2;
+  const variation = data.variations?.[variationIndex] || {};
+  const headline = variation.headline || data.headline || "";
+  const sub = variation.subheadline || data.subheadline || "";
+  const cta = variation.cta || data.cta || "SAIBA MAIS";
+
+  // Style from AI analysis
+  const S = styleGuide || {};
+  const bg = S.bgColor || "#f0ece4";
+  const textColor = S.textColor || "#111111";
+  const accentColor = S.accentColor || "#ff5c28";
+  const isLight = isLightColor(bg);
+  const useSerif = S.usesSerif !== false;
+  const textPosition = S.textPosition || "middle"; // top | middle | bottom
+  const overlayStrength = S.overlayStrength || 0.5; // 0-1
+  const hasWatermark = S.hasWatermark || false;
+  const handle = S.handle || "";
+  const credential = S.credential || "";
+  const ctaStyle = S.ctaStyle || "text"; // text | button | underline
+
+  ctx.clearRect(0, 0, W, H);
+
+  // 1. Background
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const renderTexts = () => {
+    // 2. Overlay — only if needed based on style
+    if (overlayStrength > 0 && data.expertImage) {
+      const gradY1 = textPosition === "top" ? 0 : textPosition === "middle" ? H * 0.2 : H * 0.35;
+      const gradY2 = textPosition === "top" ? H * 0.6 : H;
+      const grad = ctx.createLinearGradient(0, gradY1, 0, gradY2);
+      const alpha1 = textPosition === "middle" ? overlayStrength * 0.3 : 0;
+      const alpha2 = overlayStrength;
+      const overlayColor = isLight ? `rgba(245,240,232,${alpha2})` : `rgba(0,0,0,${alpha2})`;
+      grad.addColorStop(0, `rgba(0,0,0,${alpha1})`);
+      grad.addColorStop(1, overlayColor);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // 3. Handle top-left & credential top-right
+    if (handle || credential) {
+      const metaSize = W * 0.028;
+      ctx.font = `600 ${metaSize}px Cabinet Grotesk, sans-serif`;
+      ctx.fillStyle = isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.55)";
+      if (handle) { ctx.textAlign = "left"; ctx.fillText(handle, PAD, W * 0.07); }
+      if (credential) { ctx.textAlign = "right"; ctx.fillText(credential, W - PAD, W * 0.07); }
+    }
+
+    // 4. Text Y position based on style
+    let textStartY;
+    if (textPosition === "top") textStartY = H * 0.18;
+    else if (textPosition === "middle") textStartY = H * 0.32;
+    else textStartY = H * 0.56;
+
+    // 5. Small intro line (like "Você já percebeu como a gente • sempre tende a")
+    if (sub && textPosition !== "bottom") {
+      const introSize = W * 0.038;
+      ctx.font = `400 ${introSize}px Cabinet Grotesk, sans-serif`;
+      ctx.fillStyle = isLight ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.75)";
+      ctx.textAlign = "left";
+      // Wrap sub into max 2 lines
+      const subLines = wrapLines(ctx, sub, W - PAD * 2);
+      subLines.slice(0, 2).forEach((line, i) => {
+        ctx.fillText(line, PAD, textStartY + i * introSize * 1.4);
+      });
+      textStartY += subLines.slice(0, 2).length * introSize * 1.4 + introSize * 0.5;
+    }
+
+    // 6. Big headline
+    ctx.textAlign = "left";
+    const serifFont = "Playfair Display, Georgia, serif";
+    const sansFont = "Clash Display, sans-serif";
+
+    // Calculate font size to fill the space nicely
+    const maxW = W - PAD * 2;
+    let headFontSize = W * 0.13;
+    const minSize = W * 0.055;
+
+    while (headFontSize > minSize) {
+      ctx.font = `bold ${headFontSize}px ${useSerif ? serifFont : sansFont}`;
+      const lines = wrapLines(ctx, headline, maxW);
+      if (lines.length <= 3) break;
+      headFontSize -= 3;
+    }
+
+    ctx.font = `bold ${headFontSize}px ${useSerif ? serifFont : sansFont}`;
+    ctx.fillStyle = textColor;
+
+    const headLines = wrapLines(ctx, headline, maxW);
+    const lineH = headFontSize * 1.12;
+
+    headLines.slice(0, 3).forEach((line, i) => {
+      // Italic for even lines if serif (like reference)
+      if (useSerif && i % 2 === 1) {
+        ctx.font = `italic bold ${headFontSize}px ${serifFont}`;
+      } else {
+        ctx.font = `bold ${headFontSize}px ${useSerif ? serifFont : sansFont}`;
+      }
+      ctx.fillText(line, PAD, textStartY + i * lineH);
+    });
+
+    const afterHead = textStartY + headLines.slice(0, 3).length * lineH;
+
+    // 7. Sub below headline (if bottom layout)
+    if (sub && textPosition === "bottom") {
+      const subSize = W * 0.036;
+      ctx.font = `400 ${subSize}px Cabinet Grotesk, sans-serif`;
+      ctx.fillStyle = isLight ? "rgba(0,0,0,0.65)" : "rgba(255,255,255,0.7)";
+      const subLines = wrapLines(ctx, sub, maxW);
+      subLines.slice(0, 2).forEach((line, i) => {
+        ctx.fillText(line, PAD, afterHead + W * 0.04 + i * subSize * 1.4);
+      });
+    }
+
+    // 8. CTA
+    const ctaY = H * 0.9;
+    const ctaSize = W * 0.03;
+    ctx.font = `700 ${ctaSize}px Cabinet Grotesk, sans-serif`;
+
+    if (ctaStyle === "button") {
+      const ctaW = ctx.measureText(cta).width + PAD * 0.8;
+      const ctaH = ctaSize * 1.9;
+      ctx.fillStyle = accentColor;
+      roundRect(ctx, PAD, ctaY - ctaH * 0.7, ctaW, ctaH, 5);
+      ctx.fillStyle = isLightColor(accentColor) ? "#000" : "#fff";
+      ctx.textAlign = "center";
+      ctx.fillText(cta, PAD + ctaW / 2, ctaY + ctaH * 0.25);
+    } else if (ctaStyle === "underline") {
+      ctx.fillStyle = isLight ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.65)";
+      ctx.textAlign = "center";
+      ctx.fillText(cta, W / 2, ctaY);
+      const tw = ctx.measureText(cta).width;
+      ctx.beginPath();
+      ctx.moveTo(W / 2 - tw / 2, ctaY + 3);
+      ctx.lineTo(W / 2 + tw / 2, ctaY + 3);
+      ctx.strokeStyle = isLight ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    } else {
+      // Plain text CTA
+      ctx.fillStyle = isLight ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.6)";
+      ctx.textAlign = "center";
+      ctx.fillText(cta, W / 2, ctaY);
+    }
+
+    // 9. Watermark text (like reference)
+    if (hasWatermark) {
+      ctx.save();
+      const wmSize = W * 0.02;
+      ctx.font = `700 ${wmSize}px Cabinet Grotesk, sans-serif`;
+      ctx.fillStyle = isLight ? "rgba(0,0,0,0.055)" : "rgba(255,255,255,0.055)";
+      ctx.textAlign = "left";
+      const wm = headline.toUpperCase();
+      // Left side
+      ctx.save();
+      ctx.translate(wmSize, H * 0.45);
+      ctx.rotate(-Math.PI / 2);
+      for (let i = 0; i < 5; i++) ctx.fillText(wm + "  ", 0, i * wmSize * 1.4);
+      ctx.restore();
+      // Right side
+      ctx.save();
+      ctx.translate(W - wmSize * 0.5, H * 0.7);
+      ctx.rotate(-Math.PI / 2);
+      for (let i = 0; i < 5; i++) ctx.fillText(wm + "  ", 0, i * wmSize * 1.4);
+      ctx.restore();
+      ctx.restore();
+    }
+  };
+
+  // Draw expert photo
+  if (data.expertImage) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const scale = Math.max(W / img.width, H / img.height);
+      const dw = img.width * scale;
+      const dh = img.height * scale;
+      const dx = (W - dw) / 2;
+      const dy = (H - dh) / 2;
+      ctx.drawImage(img, dx, dy, dw, dh);
+      renderTexts();
+    };
+    img.onerror = renderTexts;
+    img.src = data.expertImage;
+  } else {
+    // Gradient bg without photo
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, bg);
+    grad.addColorStop(1, shadeColor(bg, isLight ? -25 : 25));
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    renderTexts();
   }
-  return size;
 }
 
-function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function wrapLines(ctx, text, maxWidth) {
   const words = text.split(" ");
   const lines = [];
   let line = "";
@@ -187,149 +325,8 @@ function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
       line = w + " ";
     } else line = test;
   }
-  if (line) lines.push(line.trim());
-  const limited = lines.slice(0, maxLines);
-  limited.forEach((l, i) => ctx.fillText(l, x, y + i * lineHeight));
-  return limited.length;
-}
-
-function drawCreative(canvas, data, themeIndex, styleRef) {
-  const ctx = canvas.getContext("2d");
-  const W = canvas.width;
-  const H = canvas.height;
-  const theme = THEMES[themeIndex];
-  const PAD = W * 0.08;
-
-  ctx.clearRect(0, 0, W, H);
-
-  const variation = data.variations?.[themeIndex];
-  const headline = variation?.headline || data.headline || "Headline aqui";
-  const sub = variation?.subheadline || data.subheadline || "";
-  const cta = variation?.cta || data.cta || "SAIBA MAIS";
-
-  const bgColor = theme.getBg(styleRef);
-  const textColor = theme.getTextColor(styleRef);
-  const accentColor = theme.getAccent(styleRef);
-
-  // 1. Background sólido
-  ctx.fillStyle = bgColor;
-  ctx.fillRect(0, 0, W, H);
-
-  const finishDrawing = () => {
-    // 3. Overlay gradiente
-    const overlay = theme.getOverlay(ctx, W, H);
-    ctx.fillStyle = overlay;
-    ctx.fillRect(0, 0, W, H);
-
-    const bottomY = H * 0.58;
-
-    // 4. Handle no topo
-    if (styleRef?.handle) {
-      ctx.font = `600 ${W * 0.03}px Cabinet Grotesk, sans-serif`;
-      ctx.fillStyle = themeIndex === 1 ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.5)";
-      ctx.textAlign = "left";
-      ctx.fillText(styleRef.handle, PAD, W * 0.065);
-    }
-
-    // 5. Headline — auto-ajusta tamanho
-    ctx.textAlign = "left";
-    const maxHeadlineW = W - PAD * 2;
-
-    // Calcula tamanho da fonte para caber
-    const isSerif = styleRef?.typography?.includes("serif") || styleRef?.typography?.includes("mixed");
-    const fontFamily = isSerif ? "Playfair Display, Georgia, serif" : "Clash Display, sans-serif";
-
-    let fontSize = W * 0.095;
-    const minFontSize = W * 0.045;
-
-    // Reduz até caber em 3 linhas
-    while (fontSize > minFontSize) {
-      ctx.font = `bold ${fontSize}px ${fontFamily}`;
-      const words = headline.split(" ");
-      let lines = 1, line = "";
-      for (const w of words) {
-        const test = line + w + " ";
-        if (ctx.measureText(test).width > maxHeadlineW && line) { lines++; line = w + " "; }
-        else line = test;
-      }
-      if (lines <= 3) break;
-      fontSize -= 2;
-    }
-
-    ctx.font = `bold ${fontSize}px ${fontFamily}`;
-    ctx.fillStyle = textColor;
-
-    const lineH = fontSize * 1.18;
-    const linesDrawn = drawWrappedText(ctx, headline, PAD, bottomY, maxHeadlineW, lineH, 3);
-    let currentY = bottomY + linesDrawn * lineH + W * 0.03;
-
-    // 6. Subheadline
-    if (sub && currentY < H * 0.85) {
-      let subSize = W * 0.038;
-      ctx.font = `${subSize}px Cabinet Grotesk, sans-serif`;
-      ctx.fillStyle = themeIndex === 1 ? "rgba(0,0,0,0.65)" : "rgba(255,255,255,0.75)";
-      drawWrappedText(ctx, sub, PAD, currentY, maxHeadlineW, subSize * 1.4, 2);
-      currentY += subSize * 1.4 * 2 + W * 0.04;
-    }
-
-    // 7. CTA
-    if (currentY < H * 0.94) {
-      const ctaSize = W * 0.032;
-      ctx.font = `800 ${ctaSize}px Cabinet Grotesk, sans-serif`;
-      const ctaW = ctx.measureText(cta).width + PAD;
-      const ctaH = ctaSize * 1.8;
-      const ctaY = Math.min(currentY, H * 0.91 - ctaH);
-
-      // Botão CTA
-      ctx.fillStyle = accentColor;
-      roundRect(ctx, PAD, ctaY, ctaW, ctaH, 6);
-
-      // Texto CTA
-      const ctaTextColor = themeIndex === 1 ? "#ffffff" : (accentColor === "#f5c518" ? "#000000" : "#ffffff");
-      ctx.fillStyle = ctaTextColor;
-      ctx.textAlign = "center";
-      ctx.fillText(cta, PAD + ctaW / 2, ctaY + ctaH * 0.65);
-    }
-
-    // 8. Marca d'água de texto nas laterais (estilo editorial)
-    if (styleRef?.hasTextWatermark) {
-      ctx.save();
-      ctx.font = `700 ${W * 0.022}px Cabinet Grotesk, sans-serif`;
-      ctx.fillStyle = themeIndex === 1 ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)";
-      ctx.textAlign = "left";
-      const wText = headline.toUpperCase();
-      for (let i = 0; i < 7; i++) {
-        ctx.fillText(wText, -W * 0.01, H * 0.42 + i * W * 0.032);
-      }
-      ctx.restore();
-    }
-  };
-
-  // 2. Foto do expert
-  if (data.expertImage) {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      // Posiciona foto na parte superior
-      const targetH = H * 0.65;
-      const scale = Math.max(W / img.width, targetH / img.height);
-      const dw = img.width * scale;
-      const dh = img.height * scale;
-      const dx = (W - dw) / 2;
-      ctx.drawImage(img, dx, 0, dw, dh);
-      finishDrawing();
-    };
-    img.onerror = finishDrawing;
-    img.src = data.expertImage;
-  } else {
-    // Fundo texturizado sem foto
-    const grad = ctx.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0, bgColor);
-    grad.addColorStop(1, shadeColor(bgColor, themeIndex === 1 ? -20 : 20));
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
-    finishDrawing();
-  }
+  if (line.trim()) lines.push(line.trim());
+  return lines;
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -345,6 +342,14 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.quadraticCurveTo(x, y, x + r, y);
   ctx.closePath();
   ctx.fill();
+}
+
+function isLightColor(hex) {
+  if (!hex?.startsWith("#")) return true;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 145;
 }
 
 function shadeColor(hex, amount) {
@@ -380,9 +385,7 @@ const FORMATS = [
   { id: "square", label: "Quad 1:1", w: 1, h: 1 },
 ];
 
-const PROXY_URL = "https://scintillating-nourishment-production-db0b.up.railway.app";
-
-// ─── SVG ICONS ────────────────────────────────────────────────────────────────
+// ─── ICONS ────────────────────────────────────────────────────────────────────
 const I = ({ d, size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d={d} />
@@ -399,6 +402,7 @@ const ic = {
   refresh: "M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15",
   check: "M20 6L9 17l-5-5",
   x: "M18 6L6 18M6 6l12 12",
+  eye: "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
 };
 
 // ─── UPLOAD ZONE ──────────────────────────────────────────────────────────────
@@ -416,18 +420,31 @@ function UploadZone({ label, preview, onFile }) {
 }
 
 // ─── CREATIVE CARD ────────────────────────────────────────────────────────────
-function CreativeCard({ creative, index, styleRef, onDownload, onDelete, onDuplicate }) {
+function CreativeCard({ creative, index, styleGuide, onDownload, onDelete, onDuplicate }) {
   const canvasRef = useRef();
   const format = FORMATS.find(f => f.id === creative.format) || FORMATS[0];
+
+  // Each variation gets a slight style tweak
+  const varStyle = {
+    ...styleGuide,
+    bgColor: index === 0
+      ? (styleGuide?.bgColor || "#f0ece4")
+      : index === 1
+        ? shadeColor(styleGuide?.bgColor || "#f0ece4", isLightColor(styleGuide?.bgColor || "#f0ece4") ? -15 : 15)
+        : (styleGuide?.bgAlt || shadeColor(styleGuide?.bgColor || "#f0ece4", isLightColor(styleGuide?.bgColor || "#f0ece4") ? -35 : 35)),
+    textColor: index === 1 && isLightColor(styleGuide?.bgColor || "#f0ece4")
+      ? "#ffffff"
+      : (styleGuide?.textColor || "#111111"),
+    overlayStrength: index === 0 ? (styleGuide?.overlayStrength || 0.45) : index === 1 ? 0.6 : 0.7,
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.width = CANVAS_W;
     canvas.height = CANVAS_W * (format.h / format.w);
-    const ctx = canvas.getContext("2d");
-    drawCreative(canvas, creative, index, styleRef);
-  }, [creative, index, styleRef, format]);
+    drawCreative(canvas, creative, index, varStyle);
+  }, [creative, index, styleGuide, format]);
 
   const variation = creative.variations?.[index];
 
@@ -442,21 +459,20 @@ function CreativeCard({ creative, index, styleRef, onDownload, onDelete, onDupli
           <div className="creative-name">{variation?.name || `Criativo ${index + 1}`}</div>
           <div className="ctags">
             <span className="ctag">{format.label}</span>
-            <span className="ctag">{THEMES[index].name}</span>
             <span className="ctag">{variation?.angle || "copy"}</span>
           </div>
         </div>
         <div className="cactions">
-          <div className="ibtn" title="Duplicar" onClick={() => onDuplicate(creative)}><I d={ic.copy} size={13} /></div>
-          <div className="ibtn" title="Download PNG" onClick={() => onDownload(canvasRef.current, variation?.name || `criativo-${index + 1}`)}><I d={ic.dl} size={13} /></div>
-          <div className="ibtn d" title="Excluir" onClick={() => onDelete(index)}><I d={ic.trash} size={13} /></div>
+          <div className="ibtn" onClick={() => onDuplicate(creative)}><I d={ic.copy} size={13} /></div>
+          <div className="ibtn" onClick={() => onDownload(canvasRef.current, variation?.name || `criativo-${index + 1}`)}><I d={ic.dl} size={13} /></div>
+          <div className="ibtn d" onClick={() => onDelete(index)}><I d={ic.trash} size={13} /></div>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function LaunchAdsAI() {
   const [tab, setTab] = useState("create");
   const [generating, setGenerating] = useState(false);
@@ -472,7 +488,7 @@ export default function LaunchAdsAI() {
   const [copy, setCopy] = useState("");
   const [format, setFormat] = useState("feed");
 
-  const [styleRef, setStyleRef] = useState(null);
+  const [styleGuide, setStyleGuide] = useState(null);
   const [styleDesc, setStyleDesc] = useState("");
   const [creatives, setCreatives] = useState([]);
   const [library, setLibrary] = useState([]);
@@ -484,24 +500,10 @@ export default function LaunchAdsAI() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const handleExpert = async (file) => {
-    setExpertPreview(await fileToDataURL(file));
-    showToast("Foto carregada!");
-  };
-
-  const handleAddRefs = async (files) => {
-    const arr = await Promise.all(Array.from(files).map(async f => ({
-      preview: await fileToDataURL(f),
-      base64: await fileToBase64(f),
-    })));
-    setReferences(prev => [...prev, ...arr].slice(0, 6));
-    showToast(`${files.length} referência(s) adicionada(s)!`);
-  };
-
   const analyzeRefs = async () => {
     if (!references.length) return null;
     try {
-      const imageContents = references.slice(0, 3).map(r => ({
+      const imgs = references.slice(0, 3).map(r => ({
         type: "image",
         source: { type: "base64", media_type: "image/jpeg", data: r.base64 },
       }));
@@ -510,24 +512,30 @@ export default function LaunchAdsAI() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 800,
+          max_tokens: 900,
           messages: [{
             role: "user",
             content: [
-              ...imageContents,
+              ...imgs,
               {
                 type: "text",
-                text: `Analise o estilo visual dessas referências de criativos para tráfego pago.
-Responda SOMENTE em JSON válido sem markdown:
+                text: `Você é especialista em design de criativos para tráfego pago.
+Analise DETALHADAMENTE o estilo visual dessas referências e extraia as propriedades exatas.
+
+Responda SOMENTE em JSON válido sem markdown ou texto extra:
 {
-  "backgrounds": ["#hexcolor1","#hexcolor2"],
-  "textColors": ["#hexcolor"],
-  "accentColors": ["#hexcolor"],
-  "typography": "serif|sans|mixed",
-  "hasTextWatermark": true|false,
-  "handle": "@handle se visível ou string vazia",
-  "credential": "credencial se visível ou string vazia",
-  "styleDescription": "descrição do estilo em português máx 60 chars"
+  "bgColor": "#hexcode da cor de fundo dominante",
+  "bgAlt": "#hexcode variação do fundo para segunda versão",
+  "textColor": "#hexcode cor principal do texto",
+  "accentColor": "#hexcode cor de destaque/CTA",
+  "usesSerif": true ou false (usa fonte serif no headline?),
+  "textPosition": "top" ou "middle" ou "bottom" (onde o texto principal está?),
+  "overlayStrength": 0.0 a 0.8 (quão forte é o overlay sobre a foto?),
+  "hasWatermark": true ou false (tem texto repetido em marca d'água?),
+  "ctaStyle": "text" ou "button" ou "underline" (como o CTA aparece?),
+  "handle": "@handle se visível senão string vazia",
+  "credential": "título/profissão se visível senão string vazia",
+  "styleDescription": "descrição do estilo em português máx 80 chars"
 }`,
               },
             ],
@@ -538,6 +546,7 @@ Responda SOMENTE em JSON válido sem markdown:
       const text = data.content?.find(b => b.type === "text")?.text || "{}";
       return JSON.parse(text.replace(/```json|```/g, "").trim());
     } catch (e) {
+      console.error("analyzeRefs error:", e);
       return null;
     }
   };
@@ -549,7 +558,7 @@ Responda SOMENTE em JSON válido sem markdown:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 800,
+          max_tokens: 900,
           messages: [{
             role: "user",
             content: `Expert em copywriting para lançamentos digitais no Brasil.
@@ -558,15 +567,16 @@ COPY BASE:
 Headline: ${headline}
 Sub: ${subheadline || "não informado"}
 CTA: ${cta || "não informado"}
-Formato: ${format}
+Copy: ${copy || "não informada"}
+Estilo detectado: ${guide?.styleDescription || "editorial clean"}
 
-Gere 3 variações de copy. Cada headline deve ter NO MÁXIMO 50 caracteres.
+Gere 3 variações de copy. IMPORTANTE: headline máx 45 chars, sub máx 60 chars, cta máx 18 chars.
 Responda SOMENTE em JSON válido:
 {
   "variations": [
-    {"name":"string","headline":"string máx 50 chars","subheadline":"string máx 65 chars","cta":"string máx 20 chars MAIÚSCULAS","angle":"urgência"},
-    {"name":"string","headline":"string máx 50 chars","subheadline":"string máx 65 chars","cta":"string máx 20 chars MAIÚSCULAS","angle":"benefício"},
-    {"name":"string","headline":"string máx 50 chars","subheadline":"string máx 65 chars","cta":"string máx 20 chars MAIÚSCULAS","angle":"prova social"}
+    {"name":"Urgência","headline":"string","subheadline":"string","cta":"MAIÚSCULAS","angle":"urgência"},
+    {"name":"Benefício","headline":"string","subheadline":"string","cta":"MAIÚSCULAS","angle":"benefício"},
+    {"name":"Curiosidade","headline":"string","subheadline":"string","cta":"MAIÚSCULAS","angle":"curiosidade"}
   ]
 }`,
           }],
@@ -586,60 +596,53 @@ Responda SOMENTE em JSON válido:
     setProgress(0);
 
     try {
-      const steps = [
-        [20, "Analisando referências com IA..."],
-        [45, "Extraindo paleta e tipografia..."],
-        [65, "Gerando variações de copy..."],
-        [85, "Montando os criativos..."],
+      const stepsConfig = [
+        [15, "Analisando referências com Claude Vision..."],
+        [40, "Extraindo cores, tipografia e layout..."],
+        [60, "Gerando variações de copy com IA..."],
+        [80, "Montando os criativos..."],
         [100, "Finalizando..."],
       ];
 
       let guide = null;
       let copyData = null;
 
-      for (let i = 0; i < steps.length; i++) {
-        setProgress(steps[i][0]);
-        setStep(steps[i][1]);
-
+      for (let i = 0; i < stepsConfig.length; i++) {
+        setProgress(stepsConfig[i][0]);
+        setStep(stepsConfig[i][1]);
         if (i === 0) {
           guide = await analyzeRefs();
-          if (guide) { setStyleRef(guide); setStyleDesc(guide.styleDescription || ""); }
+          if (guide) { setStyleGuide(guide); setStyleDesc(guide.styleDescription || ""); }
         } else if (i === 2) {
           copyData = await generateCopy(guide);
         } else {
-          await new Promise(r => setTimeout(r, 400));
+          await new Promise(r => setTimeout(r, 350));
         }
       }
 
-      // Fallback style
+      // Fallback
       if (!guide) {
         guide = {
-          backgrounds: ["#f5f0e8", "#1a1a2e"],
-          textColors: ["#111111"],
-          accentColors: ["#ff5c28"],
-          typography: "mixed",
-          hasTextWatermark: false,
-          handle: "",
-          credential: "",
-          styleDescription: "Editorial moderno",
+          bgColor: "#f0ece4", bgAlt: "#1a1a2e",
+          textColor: "#111111", accentColor: "#ff5c28",
+          usesSerif: true, textPosition: "middle",
+          overlayStrength: 0.45, hasWatermark: false,
+          ctaStyle: "text", handle: "", credential: "",
+          styleDescription: "Editorial clean com serif",
         };
-        setStyleRef(guide);
+        setStyleGuide(guide);
       }
 
-      // Fallback copy
-      const defaultVariations = [
-        { name: "Urgência", headline: headline.slice(0, 50), subheadline: subheadline || "Não perca essa oportunidade", cta: cta || "QUERO PARTICIPAR", angle: "urgência" },
-        { name: "Benefício", headline: headline.slice(0, 50), subheadline: subheadline || "Descubra como transformar sua vida", cta: cta || "SAIBA MAIS", angle: "benefício" },
-        { name: "Prova Social", headline: headline.slice(0, 50), subheadline: subheadline || "Mais de 10 mil pessoas já mudaram", cta: cta || "VER HISTÓRIAS", angle: "prova social" },
+      const defaultVars = [
+        { name: "Urgência", headline: headline.slice(0, 45), subheadline: subheadline.slice(0, 60), cta: cta || "LEIA A LEGENDA", angle: "urgência" },
+        { name: "Benefício", headline: headline.slice(0, 45), subheadline: subheadline.slice(0, 60), cta: cta || "SAIBA MAIS", angle: "benefício" },
+        { name: "Curiosidade", headline: headline.slice(0, 45), subheadline: subheadline.slice(0, 60), cta: cta || "VER MAIS", angle: "curiosidade" },
       ];
 
       const creative = {
-        headline,
-        subheadline,
-        cta,
-        format,
+        headline, subheadline, cta, format,
         expertImage: expertPreview,
-        variations: copyData?.variations || defaultVariations,
+        variations: copyData?.variations || defaultVars,
         id: Date.now(),
         createdAt: new Date().toLocaleString("pt-BR"),
       };
@@ -661,14 +664,6 @@ Responda SOMENTE em JSON válido:
     a.download = `${name}.png`;
     a.click();
     showToast("Download iniciado!");
-  };
-
-  const handleDelete = (idx) => {
-    setCreatives(prev => {
-      const c = { ...prev[0] };
-      c.variations = c.variations.filter((_, i) => i !== idx);
-      return [c];
-    });
   };
 
   const creative = creatives[0];
@@ -733,9 +728,9 @@ Responda SOMENTE em JSON válido:
                 <div className="generate-bar">
                   <div>
                     <h3>✦ Gerador com Análise de Referências</h3>
-                    <p>Suba referências — a IA analisa o estilo e replica nos seus criativos</p>
+                    <p>Suba referências — a IA detecta cores, tipografia e layout e replica no seu criativo</p>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(255,92,40,.1)", color: "var(--accent)", border: "1px solid rgba(255,92,40,.2)" }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(255,92,40,.1)", color: "var(--accent)", border: "1px solid rgba(255,92,40,.2)" }}>
                     <I d={ic.spark} size={12} /> Claude Vision
                   </div>
                 </div>
@@ -745,31 +740,45 @@ Responda SOMENTE em JSON válido:
 
                     <div className="card">
                       <div className="card-title"><span className="num">01</span> Foto do Expert</div>
-                      <UploadZone label="Upload da foto do expert" preview={expertPreview} onFile={handleExpert} />
+                      <UploadZone label="Upload da foto do expert" preview={expertPreview} onFile={async f => { setExpertPreview(await fileToDataURL(f)); showToast("Foto carregada!"); }} />
                     </div>
 
                     <div className="card">
                       <div className="card-title"><span className="num">02</span> Referências de Design</div>
-                      <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, lineHeight: 1.5 }}>
-                        Suba criativos que você gosta — a IA vai extrair as cores, tipografia e layout.
+                      <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, lineHeight: 1.6 }}>
+                        Suba criativos que você gosta. A IA detecta automaticamente o estilo e replica nas suas artes.
                       </p>
                       <div className="refs-grid">
                         {references.map((r, i) => (
                           <div className="ref-thumb" key={i}>
                             <img src={r.preview} alt="" />
-                            <div className="ref-remove" onClick={() => setReferences(prev => prev.filter((_, j) => j !== i))}>✕</div>
+                            <div className="ref-remove" onClick={() => setReferences(p => p.filter((_, j) => j !== i))}>✕</div>
                           </div>
                         ))}
                         {references.length < 6 && (
                           <div className="add-ref" onClick={() => addRefInput.current.click()}>
-                            <input ref={addRefInput} type="file" accept="image/*" multiple onChange={e => handleAddRefs(e.target.files)} />
+                            <input ref={addRefInput} type="file" accept="image/*" multiple onChange={async e => {
+                              const files = Array.from(e.target.files);
+                              const arr = await Promise.all(files.map(async f => ({ preview: await fileToDataURL(f), base64: await fileToBase64(f) })));
+                              setReferences(p => [...p, ...arr].slice(0, 6));
+                              showToast(`${files.length} referência(s) adicionada(s)!`);
+                            }} />
                             +
                           </div>
                         )}
                       </div>
                       {styleDesc && (
-                        <div className="style-tag">
-                          <I d={ic.spark} size={11} /> {styleDesc}
+                        <div className="style-detected">
+                          <strong>✦ Estilo detectado pela IA:</strong>
+                          {styleDesc}
+                          {styleGuide && (
+                            <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              {styleGuide.bgColor && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: styleGuide.bgColor, border: "1px solid rgba(255,255,255,.2)", display: "inline-block" }} />{styleGuide.bgColor}</span>}
+                              {styleGuide.textColor && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: styleGuide.textColor, border: "1px solid rgba(255,255,255,.2)", display: "inline-block" }} />{styleGuide.textColor}</span>}
+                              {styleGuide.usesSerif !== undefined && <span style={{ fontSize: 11, background: "rgba(255,255,255,.08)", padding: "2px 6px", borderRadius: 4 }}>{styleGuide.usesSerif ? "Serif" : "Sans-serif"}</span>}
+                              {styleGuide.textPosition && <span style={{ fontSize: 11, background: "rgba(255,255,255,.08)", padding: "2px 6px", borderRadius: 4 }}>Texto {styleGuide.textPosition === "top" ? "no topo" : styleGuide.textPosition === "middle" ? "no meio" : "embaixo"}</span>}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -785,18 +794,18 @@ Responda SOMENTE em JSON válido:
                         ))}
                       </div>
                     </div>
+
                   </div>
 
                   <div className="card">
                     <div className="card-title"><span className="num">04</span> Copy do Anúncio</div>
-
                     <div className="form-group">
                       <label className="form-label">Headline *</label>
-                      <input className="form-input" placeholder="Ex: Você ainda sente dor e acha normal?" value={headline} onChange={e => setHeadline(e.target.value)} />
+                      <input className="form-input" placeholder="Ex: Você ainda normaliza a dor?" value={headline} onChange={e => setHeadline(e.target.value)} />
                     </div>
                     <div className="form-group">
                       <label className="form-label">Subheadline</label>
-                      <input className="form-input" placeholder="Ex: Fisioterapeuta revela método que mudou tudo" value={subheadline} onChange={e => setSubheadline(e.target.value)} />
+                      <input className="form-input" placeholder="Ex: Fisioterapeuta revela o método" value={subheadline} onChange={e => setSubheadline(e.target.value)} />
                     </div>
                     <div className="form-group">
                       <label className="form-label">CTA</label>
@@ -806,15 +815,12 @@ Responda SOMENTE em JSON válido:
                       <label className="form-label">Copy Completa</label>
                       <textarea className="form-textarea" placeholder="Cole a copy completa aqui..." value={copy} onChange={e => setCopy(e.target.value)} style={{ minHeight: 120 }} />
                     </div>
-
                     <hr className="divider" />
-
                     <button className="btn btn-primary" style={{ width: "100%" }} onClick={handleGenerate} disabled={generating}>
-                      <I d={ic.zap} size={15} />
-                      {generating ? "Analisando e gerando..." : "Gerar 3 Criativos com IA"}
+                      <I d={ic.zap} size={15} />{generating ? "Analisando e gerando..." : "Gerar 3 Criativos com IA"}
                     </button>
                     <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 10, textAlign: "center" }}>
-                      3 variações com temas diferentes: Dark, Light e Bold
+                      A IA detecta o estilo das referências e replica nos criativos
                     </p>
                   </div>
                 </div>
@@ -825,11 +831,9 @@ Responda SOMENTE em JSON válido:
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                       <div>
                         <h2 style={{ fontFamily: "Clash Display", fontSize: 18, fontWeight: 700 }}>Criativos Gerados</h2>
-                        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>3 variações — Dark, Light e Bold Color</p>
+                        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>3 variações no estilo das suas referências</p>
                       </div>
-                      <button className="btn btn-ghost" onClick={handleGenerate}>
-                        <I d={ic.refresh} size={13} />Regerar
-                      </button>
+                      <button className="btn btn-ghost" onClick={handleGenerate}><I d={ic.refresh} size={13} />Regerar</button>
                     </div>
                     <div className="creatives-grid">
                       {variations.map((_, i) => (
@@ -837,9 +841,15 @@ Responda SOMENTE em JSON válido:
                           key={i}
                           creative={creative}
                           index={i}
-                          styleRef={styleRef}
+                          styleGuide={styleGuide}
                           onDownload={handleDownload}
-                          onDelete={handleDelete}
+                          onDelete={(idx) => {
+                            setCreatives(prev => {
+                              const c = { ...prev[0] };
+                              c.variations = c.variations.filter((_, j) => j !== idx);
+                              return [c];
+                            });
+                          }}
                           onDuplicate={(c) => { setCreatives(prev => [...prev, { ...c, id: Date.now() }]); showToast("Duplicado!"); }}
                         />
                       ))}
@@ -858,16 +868,14 @@ Responda SOMENTE em JSON válido:
                   <button className="btn btn-primary" style={{ margin: "20px auto 0", display: "flex" }} onClick={() => setTab("create")}>Criar Agora</button>
                 </div>
               ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))", gap: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 16 }}>
                   {library.map((c, i) => (
                     <div key={c.id || i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", cursor: "pointer" }}
-                      onClick={() => { setCreatives([c]); setStyleRef(styleRef); setTab("create"); }}>
+                      onClick={() => { setCreatives([c]); setTab("create"); }}>
                       <div style={{ aspectRatio: "4/5", background: "var(--surface2)", position: "relative", overflow: "hidden" }}>
-                        {c.expertImage && <img src={c.expertImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: .7 }} />}
+                        {c.expertImage && <img src={c.expertImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: .75 }} />}
                         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,transparent,rgba(0,0,0,.85))", display: "flex", alignItems: "flex-end", padding: 12 }}>
-                          <div style={{ fontFamily: "Clash Display", fontSize: 12, fontWeight: 700, color: "white", lineHeight: 1.3 }}>
-                            {(c.headline || "").slice(0, 45)}
-                          </div>
+                          <div style={{ fontFamily: "Clash Display", fontSize: 12, fontWeight: 700, color: "white", lineHeight: 1.3 }}>{(c.headline || "").slice(0, 45)}</div>
                         </div>
                       </div>
                       <div style={{ padding: "10px 12px" }}>
