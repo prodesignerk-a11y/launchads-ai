@@ -224,7 +224,10 @@ function CreativeHTML({ data, variation, style: S, format }) {
       {/* Handle & Credential */}
       {(handle || credential) && (
         <div style={{
-          position: "absolute", top: W * 0.05, left: W * 0.06, right: W * 0.06,
+          position: "absolute", top: W * 0.05, left: W * 0.06, right: 0,
+paddingRight: W * 0.06,
+paddingLeft: W * 0.06,
+left: 0,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           {handle && <span style={{ fontSize: W * 0.028, fontWeight: 700, color: isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.55)", letterSpacing: 0.5 }}>{handle}</span>}
@@ -237,7 +240,8 @@ function CreativeHTML({ data, variation, style: S, format }) {
         position: "absolute",
         bottom: S?.overlayStyle === "top" ? "auto" : W * 0.06,
         top: S?.overlayStyle === "top" ? W * 0.1 : "auto",
-        left: W * 0.06, right: W * 0.06,
+        left: 0, right: 0, padding: `0 ${W * 0.06}px`,
+
       }}>
         {/* Intro line */}
         {sub && S?.overlayStyle === "top" && (
