@@ -255,7 +255,7 @@ function CreativeHTML({ data, variation, style: S, format }) {
           color: textColor,
           lineHeight: 1.08,
           marginBottom: W * 0.025,
-          letterSpacing: headLen > 30 ? -0.5 : -1,
+          letterSpacing: headLen > 30 ? -0.5 : -1, wordBreak: "break-word", overflowWrap: "break-word", width: "100%",
         }}>
           {/* Split headline for mixed typography effect */}
           {useSerif ? (
