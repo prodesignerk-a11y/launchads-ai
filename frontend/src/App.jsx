@@ -162,7 +162,7 @@ function CreativeHTML({ data, variation, style: S, format }) {
 
   // Font sizes based on headline length
   const headLen = headline.length;
-  const headSize = headLen < 20 ? W * 0.14 : headLen < 35 ? W * 0.11 : W * 0.085;
+  const headSize = headLen < 15 ? W * 0.11 : headLen < 25 ? W * 0.088 : headLen < 40 ? W * 0.072 : W * 0.058;
 
   return (
     <div style={{
