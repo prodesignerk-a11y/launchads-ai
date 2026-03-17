@@ -423,11 +423,9 @@ function CreativeCard({ creative, index, styleRef, onDownload, onDelete, onDupli
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const SCALE = 2;
-    canvas.width = CANVAS_W * SCALE;
-    canvas.height = CANVAS_W * (format.h / format.w) * SCALE;
+    canvas.width = CANVAS_W;
+    canvas.height = CANVAS_W * (format.h / format.w);
     const ctx = canvas.getContext("2d");
-    ctx.scale(SCALE, SCALE);
     drawCreative(canvas, creative, index, styleRef);
   }, [creative, index, styleRef, format]);
 
