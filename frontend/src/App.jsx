@@ -634,9 +634,9 @@ Responda SOMENTE em JSON válido:
       }
 
       const defaultVars = [
-        { name: "Urgência", headline: headline.slice(0, 45), subheadline: subheadline.slice(0, 60), cta: cta || "LEIA A LEGENDA", angle: "urgência" },
-        { name: "Benefício", headline: headline.slice(0, 45), subheadline: subheadline.slice(0, 60), cta: cta || "SAIBA MAIS", angle: "benefício" },
-        { name: "Curiosidade", headline: headline.slice(0, 45), subheadline: subheadline.slice(0, 60), cta: cta || "VER MAIS", angle: "curiosidade" },
+        { name: "Urgência", headline: headline, subheadline: subheadline.slice(0, 60), cta: cta || "LEIA A LEGENDA", angle: "urgência" },
+        { name: "Benefício", headline: headline, subheadline: subheadline.slice(0, 60), cta: cta || "SAIBA MAIS", angle: "benefício" },
+        { name: "Curiosidade", headline: headline, subheadline: subheadline.slice(0, 60), cta: cta || "VER MAIS", angle: "curiosidade" },
       ];
 
       const creative = {
