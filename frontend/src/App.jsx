@@ -1,6 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import html2canvas from "https://esm.sh/html2canvas@1.4.1";
 
-const style = `
+const PROXY_URL = "https://scintillating-nourishment-production-db0b.up.railway.app";
+
+const appStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Cabinet+Grotesk:wght@400;500;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 
   :root {
@@ -66,18 +69,18 @@ const style = `
   .format-preview { margin: 0 auto 6px; border-radius: 3px; }
 
   .style-detected { background: rgba(255,92,40,.06); border: 1px solid rgba(255,92,40,.2); border-radius: 10px; padding: 12px 14px; margin-top: 12px; font-size: 12px; color: var(--muted); line-height: 1.6; }
-  .style-detected strong { color: var(--accent); display: block; margin-bottom: 4px; }
+  .style-detected strong { color: var(--accent); display: block; margin-bottom: 6px; }
 
   .generate-bar { background: linear-gradient(135deg, var(--surface), rgba(255,92,40,.05)); border: 1px solid var(--border); border-radius: 14px; padding: 22px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; gap: 16px; }
   .generate-bar h3 { font-family: 'Clash Display', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 4px; }
   .generate-bar p { color: var(--muted); font-size: 12px; }
 
   .creatives-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+
   .creative-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; transition: all .25s; }
   .creative-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,.5); }
-  .canvas-wrap { position: relative; }
-  .canvas-wrap canvas { display: block; width: 100%; height: auto; }
-  .var-badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,.75); backdrop-filter: blur(6px); border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: white; }
+  .creative-preview-wrap { position: relative; overflow: hidden; }
+  .var-badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,.75); backdrop-filter: blur(6px); border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: white; z-index: 10; }
   .creative-footer { padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); }
   .creative-name { font-size: 12px; font-weight: 700; }
   .ctags { display: flex; gap: 5px; margin-top: 3px; flex-wrap: wrap; }
@@ -107,289 +110,21 @@ const style = `
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 `;
 
-const PROXY_URL = "https://scintillating-nourishment-production-db0b.up.railway.app";
-const CANVAS_W = 420;
-
-// ─── CANVAS ENGINE ────────────────────────────────────────────────────────────
-function drawCreative(canvas, data, variationIndex, styleGuide) {
-  const ctx = canvas.getContext("2d");
-  const W = canvas.width;
-  const H = canvas.height;
-  const PAD = W * 0.07;
-
-  const variation = data.variations?.[variationIndex] || {};
-  const headline = variation.headline || data.headline || "";
-  const sub = variation.subheadline || data.subheadline || "";
-  const cta = variation.cta || data.cta || "SAIBA MAIS";
-
-  // Style from AI analysis
-  const S = styleGuide || {};
-  const bg = S.bgColor || "#f0ece4";
-  const textColor = S.textColor || "#111111";
-  const accentColor = S.accentColor || "#ff5c28";
-  const isLight = isLightColor(bg);
-  const useSerif = S.usesSerif !== false;
-  const textPosition = S.textPosition || "middle"; // top | middle | bottom
-  const overlayStrength = S.overlayStrength || 0.5; // 0-1
-  const hasWatermark = S.hasWatermark || false;
-  const handle = S.handle || "";
-  const credential = S.credential || "";
-  const ctaStyle = S.ctaStyle || "text"; // text | button | underline
-
-  ctx.clearRect(0, 0, W, H);
-
-  // 1. Background
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
-
-  const renderTexts = () => {
-    // 2. Overlay — only if needed based on style
-    if (overlayStrength > 0 && data.expertImage) {
-      const gradY1 = textPosition === "top" ? 0 : textPosition === "middle" ? H * 0.2 : H * 0.35;
-      const gradY2 = textPosition === "top" ? H * 0.6 : H;
-      const grad = ctx.createLinearGradient(0, gradY1, 0, gradY2);
-      const alpha1 = textPosition === "middle" ? overlayStrength * 0.3 : 0;
-      const alpha2 = overlayStrength;
-      const overlayColor = isLight ? `rgba(245,240,232,${alpha2})` : `rgba(0,0,0,${alpha2})`;
-      grad.addColorStop(0, `rgba(0,0,0,${alpha1})`);
-      grad.addColorStop(1, overlayColor);
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, W, H);
-    }
-
-    // 3. Handle top-left & credential top-right
-    if (handle || credential) {
-      const metaSize = W * 0.028;
-      ctx.font = `600 ${metaSize}px Cabinet Grotesk, sans-serif`;
-      ctx.fillStyle = isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.55)";
-      if (handle) { ctx.textAlign = "left"; ctx.fillText(handle, PAD, W * 0.07); }
-      if (credential) { ctx.textAlign = "right"; ctx.fillText(credential, W - PAD, W * 0.07); }
-    }
-
-    // 4. Text Y position based on style
-    let textStartY;
-    if (textPosition === "top") textStartY = H * 0.18;
-    else if (textPosition === "middle") textStartY = H * 0.32;
-    else textStartY = H * 0.56;
-
-    // 5. Small intro line (like "Você já percebeu como a gente • sempre tende a")
-    if (sub && textPosition !== "bottom") {
-      const introSize = W * 0.038;
-      ctx.font = `400 ${introSize}px Cabinet Grotesk, sans-serif`;
-      ctx.fillStyle = isLight ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.75)";
-      ctx.textAlign = "left";
-      // Wrap sub into max 2 lines
-      const subLines = wrapLines(ctx, sub, W - PAD * 2);
-      subLines.slice(0, 2).forEach((line, i) => {
-        ctx.fillText(line, PAD, textStartY + i * introSize * 1.4);
-      });
-      textStartY += subLines.slice(0, 2).length * introSize * 1.4 + introSize * 0.5;
-    }
-
-    // 6. Big headline
-    ctx.textAlign = "left";
-    const serifFont = "Playfair Display, Georgia, serif";
-    const sansFont = "Clash Display, sans-serif";
-
-    // Calculate font size to fill the space nicely
-    const maxW = W - PAD * 2;
-    let headFontSize = W * 0.13;
-    const minSize = W * 0.055;
-
-    while (headFontSize > minSize) {
-      ctx.font = `bold ${headFontSize}px ${useSerif ? serifFont : sansFont}`;
-      const lines = wrapLines(ctx, headline, maxW);
-      if (lines.length <= 3) break;
-      headFontSize -= 3;
-    }
-
-    ctx.font = `bold ${headFontSize}px ${useSerif ? serifFont : sansFont}`;
-    ctx.fillStyle = textColor;
-
-    const headLines = wrapLines(ctx, headline, maxW);
-    const lineH = headFontSize * 1.12;
-
-    headLines.slice(0, 3).forEach((line, i) => {
-      // Italic for even lines if serif (like reference)
-      if (useSerif && i % 2 === 1) {
-        ctx.font = `italic bold ${headFontSize}px ${serifFont}`;
-      } else {
-        ctx.font = `bold ${headFontSize}px ${useSerif ? serifFont : sansFont}`;
-      }
-      ctx.fillText(line, PAD, textStartY + i * lineH);
-    });
-
-    const afterHead = textStartY + headLines.slice(0, 3).length * lineH;
-
-    // 7. Sub below headline (if bottom layout)
-    if (sub && textPosition === "bottom") {
-      const subSize = W * 0.036;
-      ctx.font = `400 ${subSize}px Cabinet Grotesk, sans-serif`;
-      ctx.fillStyle = isLight ? "rgba(0,0,0,0.65)" : "rgba(255,255,255,0.7)";
-      const subLines = wrapLines(ctx, sub, maxW);
-      subLines.slice(0, 2).forEach((line, i) => {
-        ctx.fillText(line, PAD, afterHead + W * 0.04 + i * subSize * 1.4);
-      });
-    }
-
-    // 8. CTA
-    const ctaY = H * 0.9;
-    const ctaSize = W * 0.03;
-    ctx.font = `700 ${ctaSize}px Cabinet Grotesk, sans-serif`;
-
-    if (ctaStyle === "button") {
-      const ctaW = ctx.measureText(cta).width + PAD * 0.8;
-      const ctaH = ctaSize * 1.9;
-      ctx.fillStyle = accentColor;
-      roundRect(ctx, PAD, ctaY - ctaH * 0.7, ctaW, ctaH, 5);
-      ctx.fillStyle = isLightColor(accentColor) ? "#000" : "#fff";
-      ctx.textAlign = "center";
-      ctx.fillText(cta, PAD + ctaW / 2, ctaY + ctaH * 0.25);
-    } else if (ctaStyle === "underline") {
-      ctx.fillStyle = isLight ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.65)";
-      ctx.textAlign = "center";
-      ctx.fillText(cta, W / 2, ctaY);
-      const tw = ctx.measureText(cta).width;
-      ctx.beginPath();
-      ctx.moveTo(W / 2 - tw / 2, ctaY + 3);
-      ctx.lineTo(W / 2 + tw / 2, ctaY + 3);
-      ctx.strokeStyle = isLight ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    } else {
-      // Plain text CTA
-      ctx.fillStyle = isLight ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.6)";
-      ctx.textAlign = "center";
-      ctx.fillText(cta, W / 2, ctaY);
-    }
-
-    // 9. Watermark text (like reference)
-    if (hasWatermark) {
-      ctx.save();
-      const wmSize = W * 0.02;
-      ctx.font = `700 ${wmSize}px Cabinet Grotesk, sans-serif`;
-      ctx.fillStyle = isLight ? "rgba(0,0,0,0.055)" : "rgba(255,255,255,0.055)";
-      ctx.textAlign = "left";
-      const wm = headline.toUpperCase();
-      // Left side
-      ctx.save();
-      ctx.translate(wmSize, H * 0.45);
-      ctx.rotate(-Math.PI / 2);
-      for (let i = 0; i < 5; i++) ctx.fillText(wm + "  ", 0, i * wmSize * 1.4);
-      ctx.restore();
-      // Right side
-      ctx.save();
-      ctx.translate(W - wmSize * 0.5, H * 0.7);
-      ctx.rotate(-Math.PI / 2);
-      for (let i = 0; i < 5; i++) ctx.fillText(wm + "  ", 0, i * wmSize * 1.4);
-      ctx.restore();
-      ctx.restore();
-    }
-  };
-
-  // Draw expert photo
-  if (data.expertImage) {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const scale = Math.max(W / img.width, H / img.height);
-      const dw = img.width * scale;
-      const dh = img.height * scale;
-      const dx = (W - dw) / 2;
-      const dy = (H - dh) / 2;
-      ctx.drawImage(img, dx, dy, dw, dh);
-      renderTexts();
-    };
-    img.onerror = renderTexts;
-    img.src = data.expertImage;
-  } else {
-    // Gradient bg without photo
-    const grad = ctx.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0, bg);
-    grad.addColorStop(1, shadeColor(bg, isLight ? -25 : 25));
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
-    renderTexts();
-  }
-}
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-function wrapLines(ctx, text, maxWidth) {
-  const words = text.split(" ");
-  const lines = [];
-  let line = "";
-  for (const w of words) {
-    const test = line + w + " ";
-    if (ctx.measureText(test).width > maxWidth && line) {
-      lines.push(line.trim());
-      line = w + " ";
-    } else line = test;
-  }
-  if (line.trim()) lines.push(line.trim());
-  return lines;
-}
-
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function isLightColor(hex) {
-  if (!hex?.startsWith("#")) return true;
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 > 145;
-}
-
-function shadeColor(hex, amount) {
-  if (!hex?.startsWith("#")) return hex || "#111";
-  const num = parseInt(hex.replace("#", ""), 16);
-  const r = Math.min(255, Math.max(0, (num >> 16) + amount));
-  const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amount));
-  const b = Math.min(255, Math.max(0, (num & 0xff) + amount));
-  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-}
-
-function fileToBase64(file) {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result.split(",")[1]);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
-}
-
-function fileToDataURL(file) {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
-}
-
 const FORMATS = [
   { id: "feed", label: "Feed 4:5", w: 4, h: 5 },
   { id: "story", label: "Story 9:16", w: 9, h: 16 },
   { id: "square", label: "Quad 1:1", w: 1, h: 1 },
 ];
 
-// ─── ICONS ────────────────────────────────────────────────────────────────────
+function fileToBase64(file) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
+}
+function fileToDataURL(file) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+}
+
 const I = ({ d, size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d={d} />
-  </svg>
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 );
 const ic = {
   upload: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12",
@@ -402,8 +137,206 @@ const ic = {
   refresh: "M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15",
   check: "M20 6L9 17l-5-5",
   x: "M18 6L6 18M6 6l12 12",
-  eye: "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
 };
+
+// ─── CREATIVE HTML RENDERER ───────────────────────────────────────────────────
+function CreativeHTML({ data, variation, style: S, format }) {
+  const fmt = FORMATS.find(f => f.id === format) || FORMATS[0];
+  const aspectRatio = fmt.h / fmt.w;
+  const W = 340;
+  const H = W * aspectRatio;
+
+  const bg = S?.bgColor || "#f0ece4";
+  const textColor = S?.textColor || "#111";
+  const accentColor = S?.accentColor || "#ff5c28";
+  const useSerif = S?.usesSerif !== false;
+  const hasWatermark = S?.hasWatermark || false;
+  const ctaStyle = S?.ctaStyle || "text";
+  const handle = S?.handle || "";
+  const credential = S?.credential || "";
+  const isLight = isLightColor(bg);
+
+  const headline = variation?.headline || data?.headline || "";
+  const sub = variation?.subheadline || data?.subheadline || "";
+  const cta = variation?.cta || data?.cta || "SAIBA MAIS";
+
+  // Font sizes based on headline length
+  const headLen = headline.length;
+  const headSize = headLen < 20 ? W * 0.14 : headLen < 35 ? W * 0.11 : W * 0.085;
+
+  return (
+    <div style={{
+      width: W, height: H, position: "relative", overflow: "hidden",
+      background: bg, fontFamily: "Cabinet Grotesk, sans-serif",
+    }}>
+      {/* Expert photo */}
+      {data?.expertImage && (
+        <img src={data.expertImage} alt="" style={{
+          position: "absolute", inset: 0, width: "100%", height: "100%",
+          objectFit: "cover", objectPosition: "center top",
+        }} />
+      )}
+
+      {/* Gradient overlay */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: S?.overlayStyle === "top"
+          ? `linear-gradient(180deg, ${isLight ? "rgba(245,240,232,0.92)" : "rgba(0,0,0,0.88)"} 0%, ${isLight ? "rgba(245,240,232,0.5)" : "rgba(0,0,0,0.4)"} 45%, transparent 70%)`
+          : `linear-gradient(180deg, transparent 0%, transparent 30%, ${isLight ? "rgba(245,240,232,0.75)" : "rgba(0,0,0,0.75)"} 60%, ${isLight ? bg : "rgba(0,0,0,0.97)"} 100%)`,
+      }} />
+
+      {/* Watermark text */}
+      {hasWatermark && (
+        <>
+          <div style={{
+            position: "absolute", left: -4, top: "40%", bottom: 0,
+            width: W * 0.12, display: "flex", flexDirection: "column",
+            gap: 2, overflow: "hidden",
+          }}>
+            {[...Array(8)].map((_, i) => (
+              <div key={i} style={{
+                fontSize: W * 0.018, fontWeight: 700, color: isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)",
+                whiteSpace: "nowrap", lineHeight: 1.4,
+                transform: "rotate(-90deg) translateX(-50%)",
+                transformOrigin: "left center",
+                letterSpacing: 1,
+              }}>{headline.toUpperCase()}</div>
+            ))}
+          </div>
+          <div style={{
+            position: "absolute", right: -4, top: "35%", bottom: 0,
+            width: W * 0.12, display: "flex", flexDirection: "column",
+            gap: 2, overflow: "hidden",
+          }}>
+            {[...Array(8)].map((_, i) => (
+              <div key={i} style={{
+                fontSize: W * 0.018, fontWeight: 700, color: isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)",
+                whiteSpace: "nowrap", lineHeight: 1.4,
+                transform: "rotate(90deg) translateX(-50%)",
+                transformOrigin: "right center",
+                letterSpacing: 1,
+              }}>{headline.toUpperCase()}</div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Handle & Credential */}
+      {(handle || credential) && (
+        <div style={{
+          position: "absolute", top: W * 0.05, left: W * 0.06, right: W * 0.06,
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          {handle && <span style={{ fontSize: W * 0.028, fontWeight: 700, color: isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.55)", letterSpacing: 0.5 }}>{handle}</span>}
+          {credential && <span style={{ fontSize: W * 0.028, fontWeight: 700, color: isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.55)", letterSpacing: 0.5 }}>{credential}</span>}
+        </div>
+      )}
+
+      {/* Main text block */}
+      <div style={{
+        position: "absolute",
+        bottom: S?.overlayStyle === "top" ? "auto" : W * 0.06,
+        top: S?.overlayStyle === "top" ? W * 0.1 : "auto",
+        left: W * 0.06, right: W * 0.06,
+      }}>
+        {/* Intro line */}
+        {sub && S?.overlayStyle === "top" && (
+          <div style={{
+            fontSize: W * 0.038, color: isLight ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.75)",
+            marginBottom: W * 0.015, lineHeight: 1.35, fontWeight: 400,
+          }}>{sub}</div>
+        )}
+
+        {/* Big headline */}
+        <div style={{
+          fontSize: headSize,
+          fontFamily: useSerif ? "Playfair Display, Georgia, serif" : "Clash Display, sans-serif",
+          fontWeight: 700,
+          color: textColor,
+          lineHeight: 1.08,
+          marginBottom: W * 0.025,
+          letterSpacing: headLen > 30 ? -0.5 : -1,
+        }}>
+          {/* Split headline for mixed typography effect */}
+          {useSerif ? (
+            headline.split(" ").map((word, i) => (
+              <span key={i} style={{
+                fontStyle: i % 3 === 2 ? "italic" : "normal",
+                display: "inline",
+              }}>{word}{" "}</span>
+            ))
+          ) : headline}
+        </div>
+
+        {/* Decorative line */}
+        {S?.hasDecorativeLine && (
+          <div style={{ width: W * 0.12, height: 2, background: accentColor, marginBottom: W * 0.02 }} />
+        )}
+
+        {/* Sub below headline */}
+        {sub && S?.overlayStyle !== "top" && (
+          <div style={{
+            fontSize: W * 0.036, color: isLight ? "rgba(0,0,0,0.65)" : "rgba(255,255,255,0.7)",
+            marginBottom: W * 0.03, lineHeight: 1.4, fontWeight: 400,
+          }}>{sub}</div>
+        )}
+
+        {/* CTA */}
+        {ctaStyle === "button" ? (
+          <div style={{
+            display: "inline-block", padding: `${W * 0.025}px ${W * 0.05}px`,
+            background: accentColor, borderRadius: 5,
+            fontSize: W * 0.028, fontWeight: 800, color: isLightColor(accentColor) ? "#000" : "#fff",
+            letterSpacing: 1, textTransform: "uppercase",
+          }}>{cta}</div>
+        ) : ctaStyle === "underline" ? (
+          <div style={{
+            fontSize: W * 0.03, fontWeight: 700,
+            color: isLight ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.6)",
+            textDecoration: "underline", letterSpacing: 1,
+            textTransform: "uppercase",
+          }}>{cta}</div>
+        ) : (
+          <div style={{
+            fontSize: W * 0.03, fontWeight: 700,
+            color: isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.55)",
+            letterSpacing: 1.5, textTransform: "uppercase",
+          }}>{cta}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function isLightColor(hex) {
+  if (!hex?.startsWith("#")) return true;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 145;
+}
+
+// Style variants for 3 different looks from same guide
+function getVariantStyle(baseStyle, index) {
+  if (!baseStyle) return null;
+  const variants = [
+    { ...baseStyle }, // Original
+    { // Darker version
+      ...baseStyle,
+      bgColor: baseStyle.bgColorDark || "#1a1a1a",
+      textColor: "#ffffff",
+      overlayStyle: "bottom",
+    },
+    { // Accent version
+      ...baseStyle,
+      bgColor: baseStyle.bgColorAlt || "#0d0d0d",
+      textColor: "#ffffff",
+      accentColor: baseStyle.accentColor || "#ff5c28",
+      overlayStyle: "bottom",
+    },
+  ];
+  return variants[index] || variants[0];
+}
 
 // ─── UPLOAD ZONE ──────────────────────────────────────────────────────────────
 function UploadZone({ label, preview, onFile }) {
@@ -411,60 +344,50 @@ function UploadZone({ label, preview, onFile }) {
   return (
     <div className={`upload-zone ${preview ? "has-file" : ""}`} onClick={() => ref.current.click()}>
       <input ref={ref} type="file" accept="image/*" onChange={e => e.target.files[0] && onFile(e.target.files[0])} onClick={e => e.stopPropagation()} />
-      {preview
-        ? <img src={preview} alt="preview" />
-        : <><I d={ic.upload} size={24} /><strong style={{ fontSize: 12, color: "var(--text)" }}>{label}</strong><span>Clique ou arraste</span></>
-      }
+      {preview ? <img src={preview} alt="preview" /> : <><I d={ic.upload} size={24} /><strong style={{ fontSize: 12, color: "var(--text)" }}>{label}</strong><span>Clique ou arraste</span></>}
     </div>
   );
 }
 
 // ─── CREATIVE CARD ────────────────────────────────────────────────────────────
-function CreativeCard({ creative, index, styleGuide, onDownload, onDelete, onDuplicate }) {
-  const canvasRef = useRef();
-  const format = FORMATS.find(f => f.id === creative.format) || FORMATS[0];
-
-  // Each variation gets a slight style tweak
-  const varStyle = {
-    ...styleGuide,
-    bgColor: index === 0
-      ? (styleGuide?.bgColor || "#f0ece4")
-      : index === 1
-        ? shadeColor(styleGuide?.bgColor || "#f0ece4", isLightColor(styleGuide?.bgColor || "#f0ece4") ? -15 : 15)
-        : (styleGuide?.bgAlt || shadeColor(styleGuide?.bgColor || "#f0ece4", isLightColor(styleGuide?.bgColor || "#f0ece4") ? -35 : 35)),
-    textColor: index === 1 && isLightColor(styleGuide?.bgColor || "#f0ece4")
-      ? "#ffffff"
-      : (styleGuide?.textColor || "#111111"),
-    overlayStrength: index === 0 ? (styleGuide?.overlayStrength || 0.45) : index === 1 ? 0.6 : 0.7,
-  };
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    canvas.width = CANVAS_W;
-    canvas.height = CANVAS_W * (format.h / format.w);
-    drawCreative(canvas, creative, index, varStyle);
-  }, [creative, index, styleGuide, format]);
-
+function CreativeCard({ creative, index, styleGuide, onDownload, onDelete, onDuplicate, format }) {
+  const previewRef = useRef();
+  const varStyle = getVariantStyle(styleGuide, index);
   const variation = creative.variations?.[index];
+  const fmt = FORMATS.find(f => f.id === format) || FORMATS[0];
+
+  const handleDownload = async () => {
+    if (!previewRef.current) return;
+    try {
+      const canvas = await html2canvas(previewRef.current, { scale: 3, useCORS: true, allowTaint: true });
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = `${variation?.name || "criativo"}-${index + 1}.png`;
+      a.click();
+    } catch (e) {
+      onDownload(null, variation?.name);
+    }
+  };
 
   return (
     <div className="creative-card">
-      <div className="canvas-wrap">
-        <canvas ref={canvasRef} />
+      <div className="creative-preview-wrap">
+        <div ref={previewRef}>
+          <CreativeHTML data={creative} variation={variation} style={varStyle} format={format} />
+        </div>
         <div className="var-badge">Variação {index + 1}</div>
       </div>
       <div className="creative-footer">
         <div>
           <div className="creative-name">{variation?.name || `Criativo ${index + 1}`}</div>
           <div className="ctags">
-            <span className="ctag">{format.label}</span>
+            <span className="ctag">{fmt.label}</span>
             <span className="ctag">{variation?.angle || "copy"}</span>
           </div>
         </div>
         <div className="cactions">
           <div className="ibtn" onClick={() => onDuplicate(creative)}><I d={ic.copy} size={13} /></div>
-          <div className="ibtn" onClick={() => onDownload(canvasRef.current, variation?.name || `criativo-${index + 1}`)}><I d={ic.dl} size={13} /></div>
+          <div className="ibtn" onClick={handleDownload}><I d={ic.dl} size={13} /></div>
           <div className="ibtn d" onClick={() => onDelete(index)}><I d={ic.trash} size={13} /></div>
         </div>
       </div>
@@ -503,16 +426,13 @@ export default function LaunchAdsAI() {
   const analyzeRefs = async () => {
     if (!references.length) return null;
     try {
-      const imgs = references.slice(0, 3).map(r => ({
-        type: "image",
-        source: { type: "base64", media_type: "image/jpeg", data: r.base64 },
-      }));
+      const imgs = references.slice(0, 3).map(r => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: r.base64 } }));
       const res = await fetch(`${PROXY_URL}/api/claude`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 900,
+          max_tokens: 1000,
           messages: [{
             role: "user",
             content: [
@@ -520,22 +440,24 @@ export default function LaunchAdsAI() {
               {
                 type: "text",
                 text: `Você é especialista em design de criativos para tráfego pago.
-Analise DETALHADAMENTE o estilo visual dessas referências e extraia as propriedades exatas.
+Analise DETALHADAMENTE o estilo visual dessas referências.
 
-Responda SOMENTE em JSON válido sem markdown ou texto extra:
+Responda SOMENTE em JSON válido sem markdown:
 {
-  "bgColor": "#hexcode da cor de fundo dominante",
-  "bgAlt": "#hexcode variação do fundo para segunda versão",
-  "textColor": "#hexcode cor principal do texto",
-  "accentColor": "#hexcode cor de destaque/CTA",
-  "usesSerif": true ou false (usa fonte serif no headline?),
-  "textPosition": "top" ou "middle" ou "bottom" (onde o texto principal está?),
-  "overlayStrength": 0.0 a 0.8 (quão forte é o overlay sobre a foto?),
-  "hasWatermark": true ou false (tem texto repetido em marca d'água?),
-  "ctaStyle": "text" ou "button" ou "underline" (como o CTA aparece?),
-  "handle": "@handle se visível senão string vazia",
-  "credential": "título/profissão se visível senão string vazia",
-  "styleDescription": "descrição do estilo em português máx 80 chars"
+  "bgColor": "#hex cor de fundo dominante",
+  "bgColorDark": "#hex versão escura do fundo",
+  "bgColorAlt": "#hex cor alternativa de fundo",
+  "textColor": "#hex cor principal do texto",
+  "accentColor": "#hex cor de destaque",
+  "usesSerif": true ou false,
+  "overlayStyle": "top" ou "bottom" (onde fica a área de texto?),
+  "overlayStrength": 0.0 a 0.9,
+  "hasWatermark": true ou false (tem texto repetido pequeno?),
+  "hasDecorativeLine": true ou false (tem linha decorativa?),
+  "ctaStyle": "text" ou "button" ou "underline",
+  "handle": "@handle se visível ou string vazia",
+  "credential": "título se visível ou string vazia",
+  "styleDescription": "descrição curta do estilo em português máx 80 chars"
 }`,
               },
             ],
@@ -546,7 +468,6 @@ Responda SOMENTE em JSON válido sem markdown ou texto extra:
       const text = data.content?.find(b => b.type === "text")?.text || "{}";
       return JSON.parse(text.replace(/```json|```/g, "").trim());
     } catch (e) {
-      console.error("analyzeRefs error:", e);
       return null;
     }
   };
@@ -567,16 +488,17 @@ COPY BASE:
 Headline: ${headline}
 Sub: ${subheadline || "não informado"}
 CTA: ${cta || "não informado"}
-Copy: ${copy || "não informada"}
-Estilo detectado: ${guide?.styleDescription || "editorial clean"}
+Estilo: ${guide?.styleDescription || "editorial clean"}
 
-Gere 3 variações de copy. IMPORTANTE: headline máx 45 chars, sub máx 60 chars, cta máx 18 chars.
-Responda SOMENTE em JSON válido:
+Gere 3 variações de copy com ângulos diferentes.
+headline: máx 50 chars | sub: máx 65 chars | cta: máx 20 chars MAIÚSCULAS
+
+Responda SOMENTE em JSON:
 {
   "variations": [
-    {"name":"Urgência","headline":"string","subheadline":"string","cta":"MAIÚSCULAS","angle":"urgência"},
-    {"name":"Benefício","headline":"string","subheadline":"string","cta":"MAIÚSCULAS","angle":"benefício"},
-    {"name":"Curiosidade","headline":"string","subheadline":"string","cta":"MAIÚSCULAS","angle":"curiosidade"}
+    {"name":"Urgência","headline":"...","subheadline":"...","cta":"...","angle":"urgência"},
+    {"name":"Benefício","headline":"...","subheadline":"...","cta":"...","angle":"benefício"},
+    {"name":"Curiosidade","headline":"...","subheadline":"...","cta":"...","angle":"curiosidade"}
   ]
 }`,
           }],
@@ -594,59 +516,31 @@ Responda SOMENTE em JSON válido:
     if (!headline) return showToast("Preencha a headline!", "error");
     setGenerating(true);
     setProgress(0);
-
     try {
-      const stepsConfig = [
-        [15, "Analisando referências com Claude Vision..."],
-        [40, "Extraindo cores, tipografia e layout..."],
-        [60, "Gerando variações de copy com IA..."],
-        [80, "Montando os criativos..."],
+      const steps = [
+        [20, "Analisando referências com Claude Vision..."],
+        [50, "Extraindo estilo visual..."],
+        [70, "Gerando variações de copy..."],
+        [90, "Montando os criativos..."],
         [100, "Finalizando..."],
       ];
-
-      let guide = null;
-      let copyData = null;
-
-      for (let i = 0; i < stepsConfig.length; i++) {
-        setProgress(stepsConfig[i][0]);
-        setStep(stepsConfig[i][1]);
-        if (i === 0) {
-          guide = await analyzeRefs();
-          if (guide) { setStyleGuide(guide); setStyleDesc(guide.styleDescription || ""); }
-        } else if (i === 2) {
-          copyData = await generateCopy(guide);
-        } else {
-          await new Promise(r => setTimeout(r, 350));
-        }
+      let guide = null, copyData = null;
+      for (let i = 0; i < steps.length; i++) {
+        setProgress(steps[i][0]); setStep(steps[i][1]);
+        if (i === 0) { guide = await analyzeRefs(); if (guide) { setStyleGuide(guide); setStyleDesc(guide.styleDescription || ""); } }
+        else if (i === 2) { copyData = await generateCopy(guide); }
+        else await new Promise(r => setTimeout(r, 350));
       }
-
-      // Fallback
       if (!guide) {
-        guide = {
-          bgColor: "#f0ece4", bgAlt: "#1a1a2e",
-          textColor: "#111111", accentColor: "#ff5c28",
-          usesSerif: true, textPosition: "middle",
-          overlayStrength: 0.45, hasWatermark: false,
-          ctaStyle: "text", handle: "", credential: "",
-          styleDescription: "Editorial clean com serif",
-        };
+        guide = { bgColor: "#f0ece4", bgColorDark: "#1a1a1a", bgColorAlt: "#0d0d0d", textColor: "#111", accentColor: "#ff5c28", usesSerif: true, overlayStyle: "bottom", overlayStrength: 0.6, hasWatermark: false, hasDecorativeLine: false, ctaStyle: "text", handle: "", credential: "", styleDescription: "Editorial clean" };
         setStyleGuide(guide);
       }
-
       const defaultVars = [
-        { name: "Urgência", headline: headline, subheadline: subheadline.slice(0, 60), cta: cta || "LEIA A LEGENDA", angle: "urgência" },
-        { name: "Benefício", headline: headline, subheadline: subheadline.slice(0, 60), cta: cta || "SAIBA MAIS", angle: "benefício" },
-        { name: "Curiosidade", headline: headline, subheadline: subheadline.slice(0, 60), cta: cta || "VER MAIS", angle: "curiosidade" },
+        { name: "Urgência", headline, subheadline, cta: cta || "LEIA A LEGENDA", angle: "urgência" },
+        { name: "Benefício", headline, subheadline, cta: cta || "SAIBA MAIS", angle: "benefício" },
+        { name: "Curiosidade", headline, subheadline, cta: cta || "VER MAIS", angle: "curiosidade" },
       ];
-
-      const creative = {
-        headline, subheadline, cta, format,
-        expertImage: expertPreview,
-        variations: copyData?.variations || defaultVars,
-        id: Date.now(),
-        createdAt: new Date().toLocaleString("pt-BR"),
-      };
-
+      const creative = { headline, subheadline, cta, format, expertImage: expertPreview, variations: copyData?.variations || defaultVars, id: Date.now(), createdAt: new Date().toLocaleString("pt-BR") };
       setCreatives([creative]);
       setLibrary(prev => [creative, ...prev]);
       showToast("3 criativos gerados! 🎉");
@@ -657,21 +551,12 @@ Responda SOMENTE em JSON válido:
     }
   };
 
-  const handleDownload = (canvas, name) => {
-    if (!canvas) return;
-    const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/png");
-    a.download = `${name}.png`;
-    a.click();
-    showToast("Download iniciado!");
-  };
-
   const creative = creatives[0];
   const variations = creative?.variations || [];
 
   return (
     <>
-      <style>{style}</style>
+      <style>{appStyle}</style>
 
       {generating && (
         <div className="overlay">
@@ -685,8 +570,7 @@ Responda SOMENTE em JSON válido:
 
       {toast && (
         <div className={`toast ${toast.type}`}>
-          <I d={toast.type === "success" ? ic.check : ic.x} size={14} />
-          {toast.msg}
+          <I d={toast.type === "success" ? ic.check : ic.x} size={14} />{toast.msg}
         </div>
       )}
 
@@ -696,18 +580,14 @@ Responda SOMENTE em JSON válido:
             <div className="logo-text">LaunchAds AI</div>
             <div className="logo-sub">Criativos que convertem</div>
           </div>
-          {[
-            { id: "create", icon: ic.spark, label: "Criar Criativo" },
-            { id: "library", icon: ic.grid, label: "Biblioteca" },
-          ].map(item => (
+          {[{ id: "create", icon: ic.spark, label: "Criar Criativo" }, { id: "library", icon: ic.grid, label: "Biblioteca" }].map(item => (
             <div key={item.id} className={`nav-item ${tab === item.id ? "active" : ""}`} onClick={() => setTab(item.id)}>
               <I d={item.icon} size={15} />{item.label}
             </div>
           ))}
           <div className="sidebar-footer">
             <div style={{ background: "linear-gradient(135deg,var(--accent),var(--accent2))", borderRadius: 10, padding: 12, fontSize: 12, fontWeight: 700, color: "white" }}>
-              <div style={{ fontSize: 10, opacity: .8, marginBottom: 2 }}>PLANO PRO</div>
-              Criativos ilimitados
+              <div style={{ fontSize: 10, opacity: .8, marginBottom: 2 }}>PLANO PRO</div>Criativos ilimitados
             </div>
           </div>
         </div>
@@ -728,7 +608,7 @@ Responda SOMENTE em JSON válido:
                 <div className="generate-bar">
                   <div>
                     <h3>✦ Gerador com Análise de Referências</h3>
-                    <p>Suba referências — a IA detecta cores, tipografia e layout e replica no seu criativo</p>
+                    <p>Suba referências — a IA detecta o estilo e replica nos seus criativos</p>
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(255,92,40,.1)", color: "var(--accent)", border: "1px solid rgba(255,92,40,.2)" }}>
                     <I d={ic.spark} size={12} /> Claude Vision
@@ -737,7 +617,6 @@ Responda SOMENTE em JSON válido:
 
                 <div className="grid-2">
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
                     <div className="card">
                       <div className="card-title"><span className="num">01</span> Foto do Expert</div>
                       <UploadZone label="Upload da foto do expert" preview={expertPreview} onFile={async f => { setExpertPreview(await fileToDataURL(f)); showToast("Foto carregada!"); }} />
@@ -762,8 +641,7 @@ Responda SOMENTE em JSON válido:
                               const arr = await Promise.all(files.map(async f => ({ preview: await fileToDataURL(f), base64: await fileToBase64(f) })));
                               setReferences(p => [...p, ...arr].slice(0, 6));
                               showToast(`${files.length} referência(s) adicionada(s)!`);
-                            }} />
-                            +
+                            }} />+
                           </div>
                         )}
                       </div>
@@ -772,11 +650,14 @@ Responda SOMENTE em JSON válido:
                           <strong>✦ Estilo detectado pela IA:</strong>
                           {styleDesc}
                           {styleGuide && (
-                            <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                              {styleGuide.bgColor && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: styleGuide.bgColor, border: "1px solid rgba(255,255,255,.2)", display: "inline-block" }} />{styleGuide.bgColor}</span>}
-                              {styleGuide.textColor && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: styleGuide.textColor, border: "1px solid rgba(255,255,255,.2)", display: "inline-block" }} />{styleGuide.textColor}</span>}
-                              {styleGuide.usesSerif !== undefined && <span style={{ fontSize: 11, background: "rgba(255,255,255,.08)", padding: "2px 6px", borderRadius: 4 }}>{styleGuide.usesSerif ? "Serif" : "Sans-serif"}</span>}
-                              {styleGuide.textPosition && <span style={{ fontSize: 11, background: "rgba(255,255,255,.08)", padding: "2px 6px", borderRadius: 4 }}>Texto {styleGuide.textPosition === "top" ? "no topo" : styleGuide.textPosition === "middle" ? "no meio" : "embaixo"}</span>}
+                            <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              {[styleGuide.bgColor, styleGuide.textColor, styleGuide.accentColor].filter(Boolean).map((c, i) => (
+                                <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }}>
+                                  <span style={{ width: 12, height: 12, borderRadius: 3, background: c, border: "1px solid rgba(255,255,255,.15)", display: "inline-block" }} />{c}
+                                </span>
+                              ))}
+                              <span style={{ fontSize: 11, background: "rgba(255,255,255,.08)", padding: "2px 6px", borderRadius: 4 }}>{styleGuide.usesSerif ? "Serif" : "Sans"}</span>
+                              <span style={{ fontSize: 11, background: "rgba(255,255,255,.08)", padding: "2px 6px", borderRadius: 4 }}>CTA: {styleGuide.ctaStyle}</span>
                             </div>
                           )}
                         </div>
@@ -794,7 +675,6 @@ Responda SOMENTE em JSON válido:
                         ))}
                       </div>
                     </div>
-
                   </div>
 
                   <div className="card">
@@ -813,15 +693,13 @@ Responda SOMENTE em JSON válido:
                     </div>
                     <div className="form-group">
                       <label className="form-label">Copy Completa</label>
-                      <textarea className="form-textarea" placeholder="Cole a copy completa aqui..." value={copy} onChange={e => setCopy(e.target.value)} style={{ minHeight: 120 }} />
+                      <textarea className="form-textarea" placeholder="Cole a copy completa aqui..." value={copy} onChange={e => setCopy(e.target.value)} style={{ minHeight: 100 }} />
                     </div>
                     <hr className="divider" />
                     <button className="btn btn-primary" style={{ width: "100%" }} onClick={handleGenerate} disabled={generating}>
                       <I d={ic.zap} size={15} />{generating ? "Analisando e gerando..." : "Gerar 3 Criativos com IA"}
                     </button>
-                    <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 10, textAlign: "center" }}>
-                      A IA detecta o estilo das referências e replica nos criativos
-                    </p>
+                    <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 10, textAlign: "center" }}>A IA detecta o estilo das referências e replica nos criativos</p>
                   </div>
                 </div>
 
@@ -838,18 +716,9 @@ Responda SOMENTE em JSON válido:
                     <div className="creatives-grid">
                       {variations.map((_, i) => (
                         <CreativeCard
-                          key={i}
-                          creative={creative}
-                          index={i}
-                          styleGuide={styleGuide}
-                          onDownload={handleDownload}
-                          onDelete={(idx) => {
-                            setCreatives(prev => {
-                              const c = { ...prev[0] };
-                              c.variations = c.variations.filter((_, j) => j !== idx);
-                              return [c];
-                            });
-                          }}
+                          key={i} creative={creative} index={i} styleGuide={styleGuide} format={format}
+                          onDownload={() => showToast("Download iniciado!")}
+                          onDelete={(idx) => { setCreatives(prev => { const c = { ...prev[0] }; c.variations = c.variations.filter((_, j) => j !== idx); return [c]; }); }}
                           onDuplicate={(c) => { setCreatives(prev => [...prev, { ...c, id: Date.now() }]); showToast("Duplicado!"); }}
                         />
                       ))}
@@ -861,17 +730,13 @@ Responda SOMENTE em JSON válido:
 
             {tab === "library" && (
               library.length === 0 ? (
-                <div className="empty">
-                  <I d={ic.grid} size={40} />
-                  <h3>Nenhum criativo ainda</h3>
-                  <p>Crie seu primeiro criativo para aparecer aqui</p>
+                <div className="empty"><I d={ic.grid} size={40} /><h3>Nenhum criativo ainda</h3><p>Crie seu primeiro criativo para aparecer aqui</p>
                   <button className="btn btn-primary" style={{ margin: "20px auto 0", display: "flex" }} onClick={() => setTab("create")}>Criar Agora</button>
                 </div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 16 }}>
                   {library.map((c, i) => (
-                    <div key={c.id || i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", cursor: "pointer" }}
-                      onClick={() => { setCreatives([c]); setTab("create"); }}>
+                    <div key={c.id || i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", cursor: "pointer" }} onClick={() => { setCreatives([c]); setTab("create"); }}>
                       <div style={{ aspectRatio: "4/5", background: "var(--surface2)", position: "relative", overflow: "hidden" }}>
                         {c.expertImage && <img src={c.expertImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: .75 }} />}
                         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,transparent,rgba(0,0,0,.85))", display: "flex", alignItems: "flex-end", padding: 12 }}>
