@@ -378,48 +378,56 @@ export default function LaunchAdsAI() {
     if (!references.length) return null;
     try {
       const imgs = references.slice(0, 3).map(r => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: r.base64 } }));
-      const res = await fetch(`${PROXY_URL}/api/claude`, {
+
+      // Chamada 1: extrai layout e cores em JSON simples e confiável
+      const resLayout = await fetch(`${PROXY_URL}/api/claude`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
+          max_tokens: 800,
           messages: [{
             role: "user",
             content: [
               ...imgs,
               {
                 type: "text",
-                text: `Você é especialista em design de criativos para tráfego pago e prompt engineering para Gemini Imagen 3.
-Analise as referências de anúncio acima com atenção máxima ao layout, cores e estilo visual.
-
-Responda SOMENTE em JSON válido sem markdown:
-{
-  "bgColor": "#hex da cor de fundo ou painel sólido de texto",
-  "textColor": "#hex da cor do texto principal",
-  "accentColor": "#hex da cor de destaque (botão CTA, linha decorativa)",
-  "usesSerif": true ou false,
-  "hasDecorativeLine": true ou false,
-  "ctaStyle": "button" ou "text" ou "underline",
-  "handle": "@handle visível ou string vazia",
-  "credential": "credencial/título visível ou string vazia",
-  "styleDescription": "descrição do estilo visual em português máx 100 chars",
-  "textPosition": "bottom" se texto fica na parte inferior | "top" se fica na parte superior",
-  "photoOnSide": false se a foto preenche o card inteiro | true se a foto ocupa apenas metade lateral",
-  "photoSide": "right" ou "left" (só relevante se photoOnSide for true)",
-  "overlayGradient": "bottom" se há gradiente escuro cobrindo a parte inferior para revelar texto | "top" se o gradiente cobre o topo | "none" se não há gradiente",
-  "hasSolidBand": true se há uma faixa/bloco de cor sólida atrás do texto (não gradiente) | false",
-  "geminiPromptBase": "Escreva aqui um prompt detalhado EM INGLÊS para o Gemini Imagen 3 gerar uma imagem de fundo que reproduza fielmente o estilo visual dessas referências. Descreva: lighting, background environment, textures, color palette, mood, photography style, graphic elements. NÃO inclua pessoas, rostos ou texto no prompt. Máx 200 palavras."
-}`,
+                text: `Analise essas referências de anúncio. Responda SOMENTE com JSON válido, sem markdown, sem texto fora do JSON:
+{"bgColor":"#hex","textColor":"#hex","accentColor":"#hex","usesSerif":true,"hasDecorativeLine":false,"ctaStyle":"button","handle":"","credential":"","styleDescription":"max 80 chars","textPosition":"bottom","photoOnSide":false,"photoSide":"right","overlayGradient":"bottom","hasSolidBand":false}`,
               },
             ],
           }],
         }),
       });
-      const data = await res.json();
-      const text = data.content?.find(b => b.type === "text")?.text || "{}";
-      return JSON.parse(text.replace(/```json|```/g, "").trim());
+      const layoutData = await resLayout.json();
+      const layoutText = layoutData.content?.find(b => b.type === "text")?.text || "{}";
+      const guide = JSON.parse(layoutText.replace(/```json|```/g, "").trim());
+
+      // Chamada 2: gera o prompt do Gemini como texto puro (sem JSON, sem aspas problemáticas)
+      const resPrompt = await fetch(`${PROXY_URL}/api/claude`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 400,
+          messages: [{
+            role: "user",
+            content: [
+              ...imgs,
+              {
+                type: "text",
+                text: `You are an expert at writing Gemini Imagen 3 prompts. Based on these reference ad images, write ONE detailed image generation prompt in English that will produce a background image matching this visual style. Describe: the background environment, lighting style, color palette, textures, mood, and photographic style. Do NOT include people, faces, or text in the prompt. Write ONLY the prompt, no explanations, no quotes around it.`,
+              },
+            ],
+          }],
+        }),
+      });
+      const promptData = await resPrompt.json();
+      const geminiPromptBase = promptData.content?.find(b => b.type === "text")?.text?.trim() || null;
+
+      return { ...guide, geminiPromptBase };
     } catch (e) {
+      console.error("analyzeRefs error:", e);
       return null;
     }
   };
@@ -472,9 +480,13 @@ Responda SOMENTE em JSON:
         body: JSON.stringify({ prompt, aspectRatio }),
       });
       const data = await res.json();
+      if (!data.predictions?.[0]?.bytesBase64Encoded) {
+        console.error("Gemini erro resposta:", JSON.stringify(data));
+      }
       const b64 = data.predictions?.[0]?.bytesBase64Encoded;
       return b64 ? `data:image/png;base64,${b64}` : null;
-    } catch {
+    } catch (e) {
+      console.error("Gemini fetch error:", e);
       return null;
     }
   };
