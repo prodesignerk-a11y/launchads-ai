@@ -553,11 +553,12 @@ Responda SOMENTE em JSON:
       const prompts = buildImagePrompts(guide, format);
       console.log("🎨 Prompts enviados ao fal.ai:", prompts.map(p => p.prompt));
 
-      const backgrounds = await Promise.all(prompts.map(async (p, i) => {
-        const result = await generateBackground(p.prompt, p.fmt);
-        console.log(`🖼️ Gemini variação ${i + 1}:`, result ? "✅ imagem gerada" : "❌ falhou/null");
-        return result;
-      }));
+      const backgrounds = [];
+      for (let i = 0; i < prompts.length; i++) {
+        const result = await generateBackground(prompts[i].prompt, prompts[i].fmt);
+        console.log(`🖼️ Variação ${i + 1}:`, result ? "✅ imagem gerada" : "❌ falhou/null");
+        backgrounds.push(result);
+      }
 
       setProgress(90); setStep("Montando os criativos...");
       await new Promise(r => setTimeout(r, 300));
