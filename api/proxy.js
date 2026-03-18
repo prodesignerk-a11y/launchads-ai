@@ -44,4 +44,11 @@ app.post('/api/gemini-image', async (req, res) => {
   }
 });
 
+app.get('/api/health', (req, res) => {
+  res.json({
+    anthropic: process.env.ANTHROPIC_API_KEY ? '✅ configurada' : '❌ FALTANDO',
+    gemini:    process.env.GEMINI_API_KEY    ? '✅ configurada' : '❌ FALTANDO',
+  });
+});
+
 app.listen(process.env.PORT || 3001);
