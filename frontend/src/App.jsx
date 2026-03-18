@@ -504,10 +504,21 @@ Responda SOMENTE em JSON:
       // Step 1: Analisar referências
       setProgress(15); setStep("Analisando referências com Claude Vision...");
       let guide = await analyzeRefs();
-      if (guide) { setStyleGuide(guide); setStyleDesc(guide.styleDescription || ""); }
-      else {
-        guide = { bgColor: "#f0ece4", textColor: "#111", accentColor: "#ff5c28", usesSerif: true, overlayStyle: "bottom", hasWatermark: false, hasDecorativeLine: false, ctaStyle: "button", handle: "", credential: "", styleDescription: "Editorial clean" };
+
+      if (guide) {
         setStyleGuide(guide);
+        setStyleDesc(guide.styleDescription || "");
+        console.log("✅ Style guide extraído:", guide);
+        console.log("📝 Gemini prompt base:", guide.geminiPromptBase);
+      } else {
+        console.warn("⚠️ analyzeRefs retornou null — usando fallback");
+        guide = { bgColor: "#1a1a1a", textColor: "#fff", accentColor: "#ff5c28", usesSerif: false, hasDecorativeLine: false, ctaStyle: "button", handle: "", credential: "", styleDescription: "Sem referências", textPosition: "bottom", photoOnSide: false, overlayGradient: "bottom", hasSolidBand: false, geminiPromptBase: null };
+        setStyleGuide(guide);
+      }
+
+      if (!guide.geminiPromptBase) {
+        console.warn("⚠️ geminiPromptBase vazio — Claude não gerou o prompt");
+        showToast("Referências carregadas sem prompt Gemini — verifique o console", "error");
       }
 
       // Step 2: Gerar copy
@@ -517,15 +528,21 @@ Responda SOMENTE em JSON:
       // Step 3: Gerar backgrounds com Gemini Imagen 3 (em paralelo)
       setProgress(60); setStep("Gerando 3 backgrounds únicos com Gemini Imagen 3...");
       const prompts = buildGeminiPrompts(guide, format);
-      const backgrounds = await Promise.all(prompts.map(p => generateBackground(p.prompt, p.aspectRatio)));
+      console.log("🎨 Prompts enviados ao Gemini:", prompts.map(p => p.prompt));
+
+      const backgrounds = await Promise.all(prompts.map(async (p, i) => {
+        const result = await generateBackground(p.prompt, p.aspectRatio);
+        console.log(`🖼️ Gemini variação ${i + 1}:`, result ? "✅ imagem gerada" : "❌ falhou/null");
+        return result;
+      }));
 
       setProgress(90); setStep("Montando os criativos...");
       await new Promise(r => setTimeout(r, 300));
 
       const defaultVars = [
-        { name: "Full Bleed", headline, subheadline, cta: cta || "LEIA A LEGENDA", angle: "urgência" },
-        { name: "Split Panel", headline, subheadline, cta: cta || "SAIBA MAIS", angle: "benefício" },
-        { name: "Cinematic", headline, subheadline, cta: cta || "VER MAIS", angle: "curiosidade" },
+        { name: "Variação 1", headline, subheadline, cta: cta || "LEIA A LEGENDA", angle: "urgência" },
+        { name: "Variação 2", headline, subheadline, cta: cta || "SAIBA MAIS", angle: "benefício" },
+        { name: "Variação 3", headline, subheadline, cta: cta || "VER MAIS", angle: "curiosidade" },
       ];
       const creative = {
         headline, subheadline, cta, format,
@@ -538,9 +555,12 @@ Responda SOMENTE em JSON:
       setProgress(100); setStep("Finalizando...");
       setCreatives([creative]);
       setLibrary(prev => [creative, ...prev]);
-      showToast("3 criativos gerados com Gemini!");
+
+      const geminiOk = backgrounds.filter(Boolean).length;
+      showToast(geminiOk > 0 ? `${geminiOk}/3 backgrounds Gemini gerados!` : "Gemini falhou — verifique a API key", geminiOk > 0 ? "success" : "error");
     } catch (e) {
-      showToast("Erro ao gerar. Tente novamente.", "error");
+      console.error("❌ Erro handleGenerate:", e);
+      showToast(`Erro: ${e.message}`, "error");
     } finally {
       setGenerating(false);
     }
@@ -645,20 +665,29 @@ Responda SOMENTE em JSON:
                           </div>
                         )}
                       </div>
-                      {styleDesc && (
+                      {styleGuide && (
                         <div className="style-detected">
                           <strong>✦ Estilo detectado pela IA:</strong>
                           {styleDesc}
-                          {styleGuide && (
-                            <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                              {[styleGuide.bgColor, styleGuide.textColor, styleGuide.accentColor].filter(Boolean).map((c, i) => (
-                                <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }}>
-                                  <span style={{ width: 12, height: 12, borderRadius: 3, background: c, border: "1px solid rgba(255,255,255,.15)", display: "inline-block" }} />{c}
-                                </span>
-                              ))}
-                              <span style={{ fontSize: 11, background: "rgba(255,255,255,.08)", padding: "2px 6px", borderRadius: 4 }}>{styleGuide.usesSerif ? "Serif" : "Sans"}</span>
-                              <span style={{ fontSize: 11, background: "rgba(255,255,255,.08)", padding: "2px 6px", borderRadius: 4 }}>CTA: {styleGuide.ctaStyle}</span>
-                            </div>
+                          <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {[styleGuide.bgColor, styleGuide.textColor, styleGuide.accentColor].filter(Boolean).map((c, i) => (
+                              <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }}>
+                                <span style={{ width: 12, height: 12, borderRadius: 3, background: c, border: "1px solid rgba(255,255,255,.15)", display: "inline-block" }} />{c}
+                              </span>
+                            ))}
+                            <span style={{ fontSize: 11, background: "rgba(255,255,255,.08)", padding: "2px 6px", borderRadius: 4 }}>{styleGuide.usesSerif ? "Serif" : "Sans"}</span>
+                            <span style={{ fontSize: 11, background: "rgba(255,255,255,.08)", padding: "2px 6px", borderRadius: 4 }}>texto: {styleGuide.textPosition || "?"}</span>
+                            <span style={{ fontSize: 11, background: "rgba(255,255,255,.08)", padding: "2px 6px", borderRadius: 4 }}>foto: {styleGuide.photoOnSide ? `lado ${styleGuide.photoSide}` : "full"}</span>
+                            <span style={{ fontSize: 11, background: "rgba(255,255,255,.08)", padding: "2px 6px", borderRadius: 4 }}>overlay: {styleGuide.overlayGradient || "none"}</span>
+                            <span style={{ fontSize: 11, background: styleGuide.geminiPromptBase ? "rgba(34,197,94,.15)" : "rgba(248,113,113,.15)", padding: "2px 6px", borderRadius: 4, color: styleGuide.geminiPromptBase ? "#22c55e" : "#f87171" }}>
+                              gemini prompt: {styleGuide.geminiPromptBase ? "✓ gerado" : "✗ vazio"}
+                            </span>
+                          </div>
+                          {styleGuide.geminiPromptBase && (
+                            <details style={{ marginTop: 8 }}>
+                              <summary style={{ fontSize: 11, cursor: "pointer", color: "var(--muted)" }}>Ver prompt enviado ao Gemini</summary>
+                              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4, lineHeight: 1.5, wordBreak: "break-word" }}>{styleGuide.geminiPromptBase}</div>
+                            </details>
                           )}
                         </div>
                       )}
