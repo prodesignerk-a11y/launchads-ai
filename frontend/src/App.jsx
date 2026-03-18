@@ -140,140 +140,116 @@ const ic = {
 };
 
 // ─── CREATIVE HTML RENDERER ───────────────────────────────────────────────────
-// Layout é controlado 100% pelos parâmetros extraídos das referências pelo Claude Vision.
-// As 3 variações seguem o mesmo layout base, diferindo só em paleta de cor.
+// O layout é determinado 100% pelo que Claude Vision detectou nas referências.
+// Gemini gera o fundo visual. HTML só posiciona a foto e o texto.
 function CreativeHTML({ data, variation, style: S, format, background }) {
   const fmt = FORMATS.find(f => f.id === format) || FORMATS[0];
   const W = 340;
   const H = W * (fmt.h / fmt.w);
 
-  const bg = S?.bgColor || "#1a1a1a";
-  const textColor = S?.textColor || "#ffffff";
-  const accentColor = S?.accentColor || "#ff5c28";
-  const useSerif = S?.usesSerif !== false;
-  const handle = S?.handle || "";
-  const credential = S?.credential || "";
-  const accentIsLight = isLightColor(accentColor);
-  const isLight = isLightColor(bg);
+  const bg        = S?.bgColor      || "#1a1a1a";
+  const textColor = S?.textColor    || "#ffffff";
+  const accent    = S?.accentColor  || "#ff5c28";
+  const useSerif  = S?.usesSerif    !== false;
+  const handle    = S?.handle       || "";
+  const credential = S?.credential  || "";
+  const accentLight = isLightColor(accent);
+  const bgLight     = isLightColor(bg);
 
-  // Parâmetros de layout extraídos das referências
-  const textPos = S?.textPosition || "bottom";       // "bottom" | "top" | "center-left"
-  const photoStyle = S?.photoStyle || "full-bleed";  // "full-bleed" | "right-side" | "left-side"
-  const overlayType = S?.overlayType || "gradient-bottom"; // "gradient-bottom" | "gradient-top" | "gradient-left" | "solid-panel" | "none"
-  const hasBand = S?.hasSolidTextBand || false;      // faixa sólida de cor para o texto
-  const bandPos = S?.textBandPosition || "bottom";   // "bottom" | "top"
-  const hasDecLine = S?.hasDecorativeLine || false;
+  // Parâmetros de layout (extraídos pelo Claude Vision das referências)
+  const textPos    = S?.textPosition   || "bottom";  // "bottom" | "top"
+  const photoSide  = S?.photoOnSide    || false;      // foto ocupa só metade
+  const photoRight = S?.photoSide !== "left";         // true = foto à direita
+  const overlay    = S?.overlayGradient || "bottom";  // "bottom" | "top" | "none"
+  const hasBand    = S?.hasSolidBand   || false;      // faixa sólida de cor
 
-  const headline = variation?.headline || data?.headline || "";
-  const sub = variation?.subheadline || data?.subheadline || "";
-  const cta = variation?.cta || data?.cta || "SAIBA MAIS";
-  const expertImage = data?.expertImage;
+  const headline = variation?.headline    || data?.headline    || "";
+  const sub      = variation?.subheadline || data?.subheadline || "";
+  const cta      = variation?.cta         || data?.cta         || "SAIBA MAIS";
+  const photo    = data?.expertImage;
 
-  const headLen = headline.length;
-  const headSize = headLen < 15 ? W * 0.085 : headLen < 25 ? W * 0.068 : headLen < 40 ? W * 0.056 : W * 0.046;
+  const hl = headline.length;
+  const headSize = hl < 15 ? W*0.085 : hl < 25 ? W*0.068 : hl < 40 ? W*0.056 : W*0.046;
 
-  // Gradientes de overlay
-  const overlayGradients = {
-    "gradient-bottom": "linear-gradient(180deg, transparent 0%, transparent 30%, rgba(0,0,0,0.65) 55%, rgba(0,0,0,0.95) 80%, #000 100%)",
-    "gradient-top": "linear-gradient(180deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 35%, rgba(0,0,0,0.1) 60%, transparent 100%)",
-    "gradient-left": "linear-gradient(90deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 40%, rgba(0,0,0,0.2) 70%, transparent 100%)",
-    "none": "none",
-  };
+  const Headline = () => (
+    <div style={{ fontSize: headSize, fontFamily: useSerif ? "Playfair Display, serif" : "Clash Display, sans-serif", fontWeight: 700, lineHeight: 1.08, marginBottom: W*0.02, letterSpacing: -0.5, wordBreak: "break-word", color: "inherit" }}>
+      {useSerif ? headline.split(" ").map((w, i) => <span key={i} style={{ fontStyle: i%3===2 ? "italic" : "normal" }}>{w} </span>) : headline}
+    </div>
+  );
 
-  // Texto branco em overlays escuros, cor da referência em painéis sólidos
-  const onOverlay = "#ffffff";
-  const onPanel = textColor;
+  const CTABlock = ({ color }) => (
+    <div style={{ display: "inline-flex", alignItems: "center", padding: `${W*0.022}px ${W*0.045}px`, background: accent, borderRadius: 4, fontSize: W*0.027, fontWeight: 800, color: accentLight ? "#000" : "#fff", letterSpacing: 1, textTransform: "uppercase" }}>{cta}</div>
+  );
 
-  // Posição do bloco de texto
-  const textBlockStyle = () => {
-    if (textPos === "top") return { position: "absolute", top: W * 0.07, left: 0, right: 0, padding: `0 ${W * 0.07}px` };
-    if (textPos === "center-left") return { position: "absolute", top: "50%", transform: "translateY(-50%)", left: 0, width: "65%", padding: `0 ${W * 0.07}px` };
-    return { position: "absolute", bottom: W * 0.06, left: 0, right: 0, padding: `0 ${W * 0.07}px` }; // bottom default
-  };
-
-  const headlineColor = (overlayType === "solid-panel" || hasBand) ? onPanel : onOverlay;
-  const subColor = (overlayType === "solid-panel" || hasBand)
-    ? (isLight ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.65)")
-    : "rgba(255,255,255,0.7)";
-
-  // ── Layout: Split Panel (foto de um lado, painel de texto do outro) ────────────
-  if (photoStyle === "right-side" || photoStyle === "left-side") {
-    const photoOnRight = photoStyle === "right-side";
+  // ── Split Panel: painel de texto num lado, foto no outro ─────────────────────
+  if (photoSide) {
     return (
-      <div style={{ width: W, height: H, position: "relative", overflow: "hidden", display: "flex", flexDirection: photoOnRight ? "row" : "row-reverse", fontFamily: "Cabinet Grotesk, sans-serif" }}>
-        {/* Color text panel */}
-        <div style={{ width: "46%", background: bg, position: "relative", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: `${W * 0.07}px ${W * 0.05}px ${W * 0.07}px ${W * 0.07}px`, zIndex: 2, flexShrink: 0 }}>
+      <div style={{ width: W, height: H, overflow: "hidden", display: "flex", flexDirection: photoRight ? "row" : "row-reverse", fontFamily: "Cabinet Grotesk, sans-serif" }}>
+        {/* Painel de texto */}
+        <div style={{ width: "46%", background: bg, flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: `${W*0.07}px ${W*0.05}px ${W*0.07}px ${W*0.07}px`, position: "relative", zIndex: 2, color: textColor }}>
           {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.07 }} />}
           <div>
-            {credential && <div style={{ fontSize: W * 0.024, fontWeight: 700, color: accentColor, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: W * 0.03 }}>{credential}</div>}
-            {hasDecLine && <div style={{ width: W * 0.07, height: 3, background: accentColor, marginBottom: W * 0.03 }} />}
-            <div style={{ fontSize: headSize * 0.88, fontFamily: useSerif ? "Playfair Display, serif" : "Clash Display, sans-serif", fontWeight: 700, color: onPanel, lineHeight: 1.1, marginBottom: W * 0.025, wordBreak: "break-word" }}>
-              {useSerif ? headline.split(" ").map((w, i) => <span key={i} style={{ fontStyle: i % 3 === 2 ? "italic" : "normal" }}>{w} </span>) : headline}
-            </div>
-            {sub && <div style={{ fontSize: W * 0.03, color: subColor, lineHeight: 1.45 }}>{sub}</div>}
+            {credential && <div style={{ fontSize: W*0.024, fontWeight: 700, color: accent, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: W*0.03 }}>{credential}</div>}
+            {S?.hasDecorativeLine && <div style={{ width: W*0.07, height: 3, background: accent, marginBottom: W*0.03 }} />}
+            <Headline />
+            {sub && <div style={{ fontSize: W*0.03, color: bgLight ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.6)", lineHeight: 1.45 }}>{sub}</div>}
           </div>
           <div>
-            {handle && <div style={{ fontSize: W * 0.022, color: isLight ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)", marginBottom: W * 0.02 }}>{handle}</div>}
-            <div style={{ display: "inline-block", padding: `${W * 0.02}px ${W * 0.035}px`, background: accentColor, borderRadius: 3, fontSize: W * 0.024, fontWeight: 800, color: accentIsLight ? "#000" : "#fff", letterSpacing: 1, textTransform: "uppercase" }}>{cta}</div>
+            {handle && <div style={{ fontSize: W*0.022, color: bgLight ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)", marginBottom: W*0.02 }}>{handle}</div>}
+            <CTABlock />
           </div>
         </div>
-        {/* Divider */}
-        <div style={{ width: 3, background: accentColor, flexShrink: 0, zIndex: 3 }} />
-        {/* Photo panel */}
+        <div style={{ width: 3, background: accent, flexShrink: 0 }} />
+        {/* Painel de foto */}
         <div style={{ flex: 1, position: "relative" }}>
           {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
-          {expertImage && <img src={expertImage} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />}
-          <div style={{ position: "absolute", inset: 0, background: photoOnRight ? "linear-gradient(90deg, rgba(0,0,0,0.18) 0%, transparent 40%)" : "linear-gradient(270deg, rgba(0,0,0,0.18) 0%, transparent 40%)" }} />
+          {photo && <img src={photo} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />}
+          <div style={{ position: "absolute", inset: 0, background: photoRight ? "linear-gradient(90deg,rgba(0,0,0,.15),transparent 40%)" : "linear-gradient(270deg,rgba(0,0,0,.15),transparent 40%)" }} />
         </div>
       </div>
     );
   }
 
-  // ── Layout: Full Bleed (foto preenche tudo) ───────────────────────────────────
+  // ── Full Bleed: foto + background cobrem tudo, texto em cima/baixo ────────────
+  const gradients = {
+    bottom: "linear-gradient(180deg, transparent 0%, transparent 28%, rgba(0,0,0,.65) 55%, rgba(0,0,0,.96) 80%, #000 100%)",
+    top:    "linear-gradient(180deg, rgba(0,0,0,.93) 0%, rgba(0,0,0,.55) 35%, rgba(0,0,0,.1) 60%, transparent 100%)",
+    none:   "none",
+  };
+
+  const onDark   = "#ffffff";
+  const textClr  = hasBand ? textColor : onDark;
+  const subClr   = hasBand ? (bgLight ? "rgba(0,0,0,.6)" : "rgba(255,255,255,.65)") : "rgba(255,255,255,.7)";
+  const textPosStyle = textPos === "top"
+    ? { position: "absolute", top: W*0.07, left: 0, right: 0, padding: `0 ${W*0.07}px` }
+    : { position: "absolute", bottom: W*0.06, left: 0, right: 0, padding: `0 ${W*0.07}px` };
+
   return (
     <div style={{ width: W, height: H, position: "relative", overflow: "hidden", background: bg, fontFamily: "Cabinet Grotesk, sans-serif" }}>
-      {/* Background gerado pelo Gemini */}
       {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
-      {/* Foto do expert */}
-      {expertImage && <img src={expertImage} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />}
+      {photo && <img src={photo} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />}
 
-      {/* Overlay */}
-      {overlayType !== "none" && (
-        <div style={{ position: "absolute", inset: 0, background: overlayGradients[overlayType] || overlayGradients["gradient-bottom"] }} />
-      )}
+      {/* Gradiente de overlay */}
+      {overlay !== "none" && <div style={{ position: "absolute", inset: 0, background: gradients[overlay] || gradients.bottom }} />}
 
-      {/* Faixa sólida de cor para texto */}
-      {hasBand && (
-        <div style={{
-          position: "absolute",
-          ...(bandPos === "top" ? { top: 0, left: 0, right: 0, height: "42%" } : { bottom: 0, left: 0, right: 0, height: "45%" }),
-          background: bg,
-          opacity: 0.93,
-        }} />
-      )}
+      {/* Faixa sólida de cor atrás do texto */}
+      {hasBand && <div style={{ position: "absolute", ...(textPos === "top" ? { top: 0, left: 0, right: 0, height: "43%" } : { bottom: 0, left: 0, right: 0, height: "46%" }), background: bg, opacity: 0.94 }} />}
 
-      {/* Barra de destaque no topo */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${accentColor}, transparent)` }} />
+      {/* Barra de accent no topo */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${accent},transparent)` }} />
 
-      {/* Handle / Credential */}
-      <div style={{ position: "absolute", top: W * 0.05, left: W * 0.06, right: W * 0.06, display: "flex", justifyContent: "space-between" }}>
-        {handle && <span style={{ fontSize: W * 0.026, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: 0.5 }}>{handle}</span>}
-        {credential && <span style={{ fontSize: W * 0.026, fontWeight: 700, color: accentColor, letterSpacing: 0.5 }}>{credential}</span>}
+      {/* Handle / Credencial */}
+      <div style={{ position: "absolute", top: W*0.05, left: W*0.06, right: W*0.06, display: "flex", justifyContent: "space-between", zIndex: 2 }}>
+        {handle     && <span style={{ fontSize: W*0.026, fontWeight: 700, color: "rgba(255,255,255,.5)" }}>{handle}</span>}
+        {credential && <span style={{ fontSize: W*0.026, fontWeight: 700, color: accent }}>{credential}</span>}
       </div>
 
       {/* Bloco de texto */}
-      <div style={{ ...textBlockStyle(), zIndex: 2 }}>
-        {hasDecLine && <div style={{ width: W * 0.1, height: 2, background: accentColor, marginBottom: W * 0.025 }} />}
-        <div style={{
-          fontSize: headSize,
-          fontFamily: useSerif ? "Playfair Display, Georgia, serif" : "Clash Display, sans-serif",
-          fontWeight: 700, color: headlineColor, lineHeight: 1.08,
-          marginBottom: W * 0.02, letterSpacing: -0.5, wordBreak: "break-word",
-        }}>
-          {useSerif ? headline.split(" ").map((w, i) => <span key={i} style={{ fontStyle: i % 3 === 2 ? "italic" : "normal" }}>{w} </span>) : headline}
-        </div>
-        {sub && <div style={{ fontSize: W * 0.034, color: subColor, marginBottom: W * 0.03, lineHeight: 1.4 }}>{sub}</div>}
-        <div style={{ display: "inline-flex", alignItems: "center", padding: `${W * 0.022}px ${W * 0.045}px`, background: accentColor, borderRadius: 4, fontSize: W * 0.027, fontWeight: 800, color: accentIsLight ? "#000" : "#fff", letterSpacing: 1, textTransform: "uppercase" }}>{cta}</div>
+      <div style={{ ...textPosStyle, zIndex: 2, color: textClr }}>
+        {S?.hasDecorativeLine && <div style={{ width: W*0.1, height: 2, background: accent, marginBottom: W*0.025 }} />}
+        <Headline />
+        {sub && <div style={{ fontSize: W*0.034, color: subClr, marginBottom: W*0.03, lineHeight: 1.4 }}>{sub}</div>}
+        <CTABlock />
       </div>
     </div>
   );
@@ -287,30 +263,19 @@ function isLightColor(hex) {
   return (r * 299 + g * 587 + b * 114) / 1000 > 145;
 }
 
-// 3 variações de paleta sobre o mesmo layout detectado das referências
+// 3 variações de paleta mantendo o MESMO layout detectado das referências
 function getVariantStyle(baseStyle, index) {
-  if (!baseStyle) return { ...defaultStyle };
+  if (!baseStyle) return { bgColor: "#1a1a1a", textColor: "#fff", accentColor: "#ff5c28" };
   const variants = [
-    // Variação 0: fiel às cores das referências
+    // 0: cores fiéis à referência
     { ...baseStyle },
-    // Variação 1: versão escura/invertida do mesmo layout
-    {
-      ...baseStyle,
-      bgColor: isLightColor(baseStyle.bgColor || "#fff") ? "#111111" : lightenHex(baseStyle.bgColor || "#111", 60),
-      textColor: isLightColor(baseStyle.bgColor || "#fff") ? "#ffffff" : "#111111",
-    },
-    // Variação 2: accent em destaque no mesmo layout
-    {
-      ...baseStyle,
-      bgColor: baseStyle.accentColor || "#ff5c28",
-      textColor: isLightColor(baseStyle.accentColor || "#ff5c28") ? "#111111" : "#ffffff",
-      accentColor: isLightColor(baseStyle.bgColor || "#fff") ? "#111111" : "#ffffff",
-    },
+    // 1: versão escura do mesmo layout
+    { ...baseStyle, bgColor: isLightColor(baseStyle.bgColor || "#fff") ? "#111111" : lightenHex(baseStyle.bgColor || "#111", 55), textColor: isLightColor(baseStyle.bgColor || "#fff") ? "#ffffff" : "#111111" },
+    // 2: accent como cor dominante, mesmo layout
+    { ...baseStyle, bgColor: baseStyle.accentColor || "#ff5c28", textColor: isLightColor(baseStyle.accentColor || "#ff5c28") ? "#111111" : "#ffffff", accentColor: isLightColor(baseStyle.bgColor || "#fff") ? "#111111" : "#ffffff" },
   ];
   return variants[index] || variants[0];
 }
-
-const defaultStyle = { bgColor: "#1a1a1a", textColor: "#fff", accentColor: "#ff5c28", usesSerif: false, textPosition: "bottom", photoStyle: "full-bleed", overlayType: "gradient-bottom", hasSolidTextBand: false, textBandPosition: "bottom", hasDecorativeLine: false };
 
 function lightenHex(hex, amount) {
   if (!hex?.startsWith("#")) return hex;
@@ -418,7 +383,7 @@ export default function LaunchAdsAI() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 1800,
+          max_tokens: 2000,
           messages: [{
             role: "user",
             content: [
@@ -426,33 +391,25 @@ export default function LaunchAdsAI() {
               {
                 type: "text",
                 text: `Você é especialista em design de criativos para tráfego pago e prompt engineering para Gemini Imagen 3.
-Analise PROFUNDAMENTE o estilo visual dessas referências de anúncio.
+Analise as referências de anúncio acima com atenção máxima ao layout, cores e estilo visual.
 
 Responda SOMENTE em JSON válido sem markdown:
 {
-  "bgColor": "#hex cor de fundo dominante (painel de texto ou fundo sólido)",
-  "textColor": "#hex cor principal do texto",
-  "accentColor": "#hex cor de destaque/CTA/linha decorativa",
+  "bgColor": "#hex da cor de fundo ou painel sólido de texto",
+  "textColor": "#hex da cor do texto principal",
+  "accentColor": "#hex da cor de destaque (botão CTA, linha decorativa)",
   "usesSerif": true ou false,
   "hasDecorativeLine": true ou false,
-  "ctaStyle": "text" ou "button" ou "underline",
-  "handle": "@handle se visível ou string vazia",
-  "credential": "título/credencial se visível ou string vazia",
-  "styleDescription": "descrição do estilo em português máx 100 chars",
-
-  "textPosition": "bottom" se o texto fica embaixo da foto | "top" se fica em cima | "center-left" se fica ao centro/esquerda sobre a foto",
-  "photoStyle": "full-bleed" se a foto preenche o card inteiro | "right-side" se a foto ocupa só o lado direito | "left-side" se ocupa só o lado esquerdo",
-  "overlayType": "gradient-bottom" se há gradiente escuro na parte inferior | "gradient-top" se o gradiente é no topo | "gradient-left" se o gradiente vem da esquerda para cobrir texto lateral | "solid-panel" se há um painel sólido de cor para o texto | "none" se não há overlay",
-  "hasSolidTextBand": true se há uma faixa/banner sólido de cor atrás do texto (não gradiente) | false caso contrário,
-  "textBandPosition": "bottom" ou "top" (só relevante se hasSolidTextBand for true),
-
-  "lightingStyle": "ex: studio soft-box, dramatic low-key, golden hour, moody dark",
-  "photographyStyle": "ex: editorial portrait, lifestyle candid, fashion editorial",
-  "colorMood": "ex: warm earthy tones, cool blue-grays, high contrast, vibrant saturated",
-  "compositionStyle": "ex: centered portrait, rule of thirds, full bleed closeup",
-  "graphicElements": "descreva texturas, formas, overlays visíveis em inglês",
-  "backgroundDescription": "descreva o fundo/ambiente detalhadamente em inglês para prompt de IA",
-  "overallMood": "ex: luxurious, energetic, bold disruptive, elegant minimal"
+  "ctaStyle": "button" ou "text" ou "underline",
+  "handle": "@handle visível ou string vazia",
+  "credential": "credencial/título visível ou string vazia",
+  "styleDescription": "descrição do estilo visual em português máx 100 chars",
+  "textPosition": "bottom" se texto fica na parte inferior | "top" se fica na parte superior",
+  "photoOnSide": false se a foto preenche o card inteiro | true se a foto ocupa apenas metade lateral",
+  "photoSide": "right" ou "left" (só relevante se photoOnSide for true)",
+  "overlayGradient": "bottom" se há gradiente escuro cobrindo a parte inferior para revelar texto | "top" se o gradiente cobre o topo | "none" se não há gradiente",
+  "hasSolidBand": true se há uma faixa/bloco de cor sólida atrás do texto (não gradiente) | false",
+  "geminiPromptBase": "Escreva aqui um prompt detalhado EM INGLÊS para o Gemini Imagen 3 gerar uma imagem de fundo que reproduza fielmente o estilo visual dessas referências. Descreva: lighting, background environment, textures, color palette, mood, photography style, graphic elements. NÃO inclua pessoas, rostos ou texto no prompt. Máx 200 palavras."
 }`,
               },
             ],
@@ -525,33 +482,17 @@ Responda SOMENTE em JSON:
   const buildGeminiPrompts = (guide, fmt) => {
     const aspectMap = { feed: "4:5", story: "9:16", square: "1:1" };
     const ar = aspectMap[fmt] || "4:5";
-
-    const bg = guide?.backgroundDescription || "professional advertising background";
-    const lighting = guide?.lightingStyle || "professional studio lighting";
-    const photo = guide?.photographyStyle || "editorial photography";
-    const colorMood = guide?.colorMood || "professional color tones";
-    const composition = guide?.compositionStyle || "balanced composition";
-    const elements = guide?.graphicElements || "clean minimal graphic elements";
-    const mood = guide?.overallMood || "professional";
+    const base = guide?.geminiPromptBase || "professional advertising background, high-end commercial photography, no text, no people, no faces";
     const accent = guide?.accentColor || "#ff5c28";
-    const base = `${bg}, ${lighting}, ${colorMood}, ${photo} style, ${elements}, ${mood} mood, no text, no people, no faces, ultra-high quality advertising photography, 8k sharp`;
+    const bgColor = guide?.bgColor || "#1a1a1a";
 
     return [
-      // Variant 0 — Full Bleed: fiel à referência, escurece no rodapé para o texto
-      {
-        prompt: `${base}, ${composition}, gradient darkening toward the bottom third for text overlay, faithful to reference style`,
-        aspectRatio: ar,
-      },
-      // Variant 1 — Split Panel: lado direito vivo, esquerdo mais limpo
-      {
-        prompt: `${base}, split scene — rich detailed environment on the right half, clean minimal ${guide?.bgColor || "neutral"} toned background on the left half, editorial split layout, magazine quality`,
-        aspectRatio: ar,
-      },
-      // Variant 2 — Cinematic: mais dramático com a cor de destaque
-      {
-        prompt: `${base}, dramatic cinematic reinterpretation, deep shadows, ${accent} color accent glow, volumetric atmospheric light, high contrast, luxury brand campaign aesthetic`,
-        aspectRatio: ar,
-      },
+      // Variação 0: fiel ao estilo das referências
+      { prompt: `${base}, no text, no people, no faces, ultra high quality, 8k`, aspectRatio: ar },
+      // Variação 1: mesma composição, mais escura e dramática
+      { prompt: `${base}, darker moodier version, deeper shadows, richer dark tones, dramatic lighting, no text, no people, no faces, 8k`, aspectRatio: ar },
+      // Variação 2: mesma composição, destaque na cor de accent
+      { prompt: `${base}, with bold ${accent} color accent highlights and glows, high contrast, vibrant punch, same composition style, no text, no people, no faces, 8k`, aspectRatio: ar },
     ];
   };
 
