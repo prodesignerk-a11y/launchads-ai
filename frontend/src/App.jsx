@@ -140,174 +140,135 @@ const ic = {
 };
 
 // ─── CREATIVE HTML RENDERER ───────────────────────────────────────────────────
-function CreativeHTML({ data, variation, style: S, format }) {
+function CreativeHTML({ data, variation, style: S, format, background }) {
   const fmt = FORMATS.find(f => f.id === format) || FORMATS[0];
-  const aspectRatio = fmt.h / fmt.w;
   const W = 340;
-  const H = W * aspectRatio;
+  const H = W * (fmt.h / fmt.w);
 
   const bg = S?.bgColor || "#f0ece4";
   const textColor = S?.textColor || "#111";
   const accentColor = S?.accentColor || "#ff5c28";
   const useSerif = S?.usesSerif !== false;
-  const hasWatermark = S?.hasWatermark || false;
-  const ctaStyle = S?.ctaStyle || "text";
   const handle = S?.handle || "";
   const credential = S?.credential || "";
-  const isLight = isLightColor(bg);
+  const layout = S?.layout || 0;
 
   const headline = variation?.headline || data?.headline || "";
   const sub = variation?.subheadline || data?.subheadline || "";
   const cta = variation?.cta || data?.cta || "SAIBA MAIS";
+  const expertImage = data?.expertImage;
 
-  // Font sizes based on headline length
   const headLen = headline.length;
   const headSize = headLen < 15 ? W * 0.11 : headLen < 25 ? W * 0.088 : headLen < 40 ? W * 0.072 : W * 0.058;
+  const isLight = isLightColor(bg);
+  const accentIsLight = isLightColor(accentColor);
 
-  return (
-    <div style={{
-      width: W, height: H, position: "relative", overflow: "hidden",
-      background: bg, fontFamily: "Cabinet Grotesk, sans-serif",
-    }}>
-      {/* Expert photo */}
-      {data?.expertImage && (
-        <img src={data.expertImage} alt="" style={{
-          position: "absolute", inset: 0, width: "100%", height: "100%",
-          objectFit: "cover", objectPosition: "center top",
-        }} />
-      )}
-
-      {/* Gradient overlay */}
-      <div style={{
-        position: "absolute", inset: 0,
-        background: S?.overlayStyle === "top"
-          ? `linear-gradient(180deg, ${isLight ? "rgba(245,240,232,0.92)" : "rgba(0,0,0,0.88)"} 0%, ${isLight ? "rgba(245,240,232,0.5)" : "rgba(0,0,0,0.4)"} 45%, transparent 70%)`
-          : `linear-gradient(180deg, transparent 0%, transparent 30%, ${isLight ? "rgba(245,240,232,0.75)" : "rgba(0,0,0,0.75)"} 60%, ${isLight ? bg : "rgba(0,0,0,0.97)"} 100%)`,
-      }} />
-
-      {/* Watermark text */}
-      {hasWatermark && (
-        <>
+  // ── Layout 0: Full Bleed — foto cobre tudo, texto no rodapé ──────────────────
+  if (layout === 0) {
+    return (
+      <div style={{ width: W, height: H, position: "relative", overflow: "hidden", background: "#111", fontFamily: "Cabinet Grotesk, sans-serif" }}>
+        {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+        {expertImage && <img src={expertImage} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />}
+        {/* Strong bottom gradient */}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 0%, transparent 28%, rgba(0,0,0,0.6) 52%, rgba(0,0,0,0.93) 75%, #000 100%)" }} />
+        {/* Accent top bar */}
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${accentColor}, transparent)` }} />
+        {/* Handle top */}
+        {handle && <div style={{ position: "absolute", top: W * 0.05, left: W * 0.06, fontSize: W * 0.026, fontWeight: 700, color: "rgba(255,255,255,0.55)", letterSpacing: 0.5 }}>{handle}</div>}
+        {credential && <div style={{ position: "absolute", top: W * 0.05, right: W * 0.06, fontSize: W * 0.026, fontWeight: 700, color: accentColor, letterSpacing: 0.5 }}>{credential}</div>}
+        {/* Text block */}
+        <div style={{ position: "absolute", bottom: W * 0.06, left: 0, right: 0, padding: `0 ${W * 0.07}px` }}>
+          <div style={{ width: W * 0.1, height: 2, background: accentColor, marginBottom: W * 0.025 }} />
           <div style={{
-            position: "absolute", left: -4, top: "40%", bottom: 0,
-            width: W * 0.12, display: "flex", flexDirection: "column",
-            gap: 2, overflow: "hidden",
+            fontSize: headSize,
+            fontFamily: useSerif ? "Playfair Display, Georgia, serif" : "Clash Display, sans-serif",
+            fontWeight: 700, color: "#fff", lineHeight: 1.08,
+            marginBottom: W * 0.02, letterSpacing: -0.5, wordBreak: "break-word",
           }}>
-            {[...Array(8)].map((_, i) => (
-              <div key={i} style={{
-                fontSize: W * 0.018, fontWeight: 700, color: isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)",
-                whiteSpace: "nowrap", lineHeight: 1.4,
-                transform: "rotate(-90deg) translateX(-50%)",
-                transformOrigin: "left center",
-                letterSpacing: 1,
-              }}>{headline.toUpperCase()}</div>
-            ))}
+            {useSerif ? headline.split(" ").map((w, i) => <span key={i} style={{ fontStyle: i % 3 === 2 ? "italic" : "normal" }}>{w} </span>) : headline}
           </div>
+          {sub && <div style={{ fontSize: W * 0.034, color: "rgba(255,255,255,0.65)", marginBottom: W * 0.03, lineHeight: 1.4 }}>{sub}</div>}
           <div style={{
-            position: "absolute", right: -4, top: "35%", bottom: 0,
-            width: W * 0.12, display: "flex", flexDirection: "column",
-            gap: 2, overflow: "hidden",
-          }}>
-            {[...Array(8)].map((_, i) => (
-              <div key={i} style={{
-                fontSize: W * 0.018, fontWeight: 700, color: isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)",
-                whiteSpace: "nowrap", lineHeight: 1.4,
-                transform: "rotate(90deg) translateX(-50%)",
-                transformOrigin: "right center",
-                letterSpacing: 1,
-              }}>{headline.toUpperCase()}</div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Handle & Credential */}
-      {(handle || credential) && (
-        <div style={{
-          position: "absolute", top: W * 0.05, left: W * 0.06, right: 0,
-paddingRight: W * 0.06,
-paddingLeft: W * 0.06,
-left: 0,
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}>
-          {handle && <span style={{ fontSize: W * 0.028, fontWeight: 700, color: isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.55)", letterSpacing: 0.5 }}>{handle}</span>}
-          {credential && <span style={{ fontSize: W * 0.028, fontWeight: 700, color: isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.55)", letterSpacing: 0.5 }}>{credential}</span>}
+            display: "inline-flex", alignItems: "center", gap: W * 0.02,
+            padding: `${W * 0.022}px ${W * 0.045}px`, background: accentColor,
+            borderRadius: 4, fontSize: W * 0.027, fontWeight: 800,
+            color: accentIsLight ? "#000" : "#fff", letterSpacing: 1, textTransform: "uppercase",
+          }}>{cta}</div>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* Main text block */}
-      <div style={{
-        position: "absolute",
-        bottom: S?.overlayStyle === "top" ? "auto" : W * 0.06,
-        top: S?.overlayStyle === "top" ? W * 0.1 : "auto",
-        left: 0, right: 0, padding: `0 ${W * 0.06}px`,
+  // ── Layout 1: Split Panel — texto à esquerda, foto à direita ─────────────────
+  if (layout === 1) {
+    const panelBg = bg;
+    const panelText = textColor;
+    return (
+      <div style={{ width: W, height: H, position: "relative", overflow: "hidden", display: "flex", fontFamily: "Cabinet Grotesk, sans-serif" }}>
+        {/* Left text panel */}
+        <div style={{ width: "46%", background: panelBg, position: "relative", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: `${W * 0.07}px ${W * 0.05}px ${W * 0.07}px ${W * 0.07}px`, zIndex: 2 }}>
+          {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.08 }} />}
+          <div>
+            {credential && <div style={{ fontSize: W * 0.024, fontWeight: 700, color: accentColor, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: W * 0.04 }}>{credential}</div>}
+            <div style={{ width: W * 0.07, height: 3, background: accentColor, marginBottom: W * 0.03 }} />
+            <div style={{
+              fontSize: headSize * 0.88,
+              fontFamily: useSerif ? "Playfair Display, serif" : "Clash Display, sans-serif",
+              fontWeight: 700, color: panelText, lineHeight: 1.1,
+              marginBottom: W * 0.025, wordBreak: "break-word",
+            }}>
+              {useSerif ? headline.split(" ").map((w, i) => <span key={i} style={{ fontStyle: i % 3 === 2 ? "italic" : "normal" }}>{w} </span>) : headline}
+            </div>
+            {sub && <div style={{ fontSize: W * 0.03, color: isLight ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)", lineHeight: 1.45, marginTop: W * 0.01 }}>{sub}</div>}
+          </div>
+          <div>
+            {handle && <div style={{ fontSize: W * 0.022, color: isLight ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)", marginBottom: W * 0.02 }}>{handle}</div>}
+            <div style={{
+              display: "inline-block", padding: `${W * 0.02}px ${W * 0.035}px`,
+              background: accentColor, borderRadius: 3,
+              fontSize: W * 0.024, fontWeight: 800, color: accentIsLight ? "#000" : "#fff",
+              letterSpacing: 1, textTransform: "uppercase",
+            }}>{cta}</div>
+          </div>
+        </div>
+        {/* Accent divider */}
+        <div style={{ width: 3, background: accentColor, flexShrink: 0, zIndex: 3 }} />
+        {/* Right photo panel */}
+        <div style={{ flex: 1, position: "relative" }}>
+          {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+          {expertImage && <img src={expertImage} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />}
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(0,0,0,0.2) 0%, transparent 50%)" }} />
+        </div>
+      </div>
+    );
+  }
 
-      }}>
-        {/* Intro line */}
-        {sub && S?.overlayStyle === "top" && (
-          <div style={{
-            fontSize: W * 0.038, color: isLight ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.75)",
-            marginBottom: W * 0.015, lineHeight: 1.35, fontWeight: 400,
-          }}>{sub}</div>
+  // ── Layout 2: Cinematic — fundo gerado, foto lateral, título central ──────────
+  return (
+    <div style={{ width: W, height: H, position: "relative", overflow: "hidden", background: "#000", fontFamily: "Cabinet Grotesk, sans-serif" }}>
+      {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.65 }} />}
+      {expertImage && <img src={expertImage} alt="" style={{ position: "absolute", right: 0, bottom: 0, width: "60%", height: "90%", objectFit: "cover", objectPosition: "center top" }} />}
+      {/* Diagonal light fade from left */}
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(105deg, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.82) 38%, rgba(0,0,0,0.35) 65%, transparent 100%)" }} />
+      {/* Top/bottom vignette */}
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.55) 100%)" }} />
+      {/* Vertical accent line */}
+      <div style={{ position: "absolute", left: W * 0.07, top: H * 0.12, bottom: H * 0.12, width: 3, background: accentColor }} />
+      {/* Text — left side */}
+      <div style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", left: 0, padding: `0 ${W * 0.1}px 0 ${W * 0.11}px`, width: "68%" }}>
+        {credential && (
+          <div style={{ fontSize: W * 0.024, fontWeight: 700, color: accentColor, letterSpacing: 2, textTransform: "uppercase", marginBottom: W * 0.025 }}>{credential}</div>
         )}
-
-        {/* Big headline */}
         <div style={{
           fontSize: headSize,
-          fontFamily: useSerif ? "Playfair Display, Georgia, serif" : "Clash Display, sans-serif",
-          fontWeight: 700,
-          color: textColor,
-          lineHeight: 1.08,
-          marginBottom: W * 0.025,
-          letterSpacing: headLen > 30 ? -0.5 : -1, wordBreak: "break-word", overflowWrap: "break-word", width: "100%",
-        }}>
-          {/* Split headline for mixed typography effect */}
-          {useSerif ? (
-            headline.split(" ").map((word, i) => (
-              <span key={i} style={{
-                fontStyle: i % 3 === 2 ? "italic" : "normal",
-                display: "inline",
-              }}>{word}{" "}</span>
-            ))
-          ) : headline}
-        </div>
-
-        {/* Decorative line */}
-        {S?.hasDecorativeLine && (
-          <div style={{ width: W * 0.12, height: 2, background: accentColor, marginBottom: W * 0.02 }} />
-        )}
-
-        {/* Sub below headline */}
-        {sub && S?.overlayStyle !== "top" && (
-          <div style={{
-            fontSize: W * 0.036, color: isLight ? "rgba(0,0,0,0.65)" : "rgba(255,255,255,0.7)",
-            marginBottom: W * 0.03, lineHeight: 1.4, fontWeight: 400,
-          }}>{sub}</div>
-        )}
-
-        {/* CTA */}
-        {ctaStyle === "button" ? (
-          <div style={{
-            display: "inline-block", padding: `${W * 0.025}px ${W * 0.05}px`,
-            background: accentColor, borderRadius: 5,
-            fontSize: W * 0.028, fontWeight: 800, color: isLightColor(accentColor) ? "#000" : "#fff",
-            letterSpacing: 1, textTransform: "uppercase",
-          }}>{cta}</div>
-        ) : ctaStyle === "underline" ? (
-          <div style={{
-            fontSize: W * 0.03, fontWeight: 700,
-            color: isLight ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.6)",
-            textDecoration: "underline", letterSpacing: 1,
-            textTransform: "uppercase",
-          }}>{cta}</div>
-        ) : (
-          <div style={{
-            fontSize: W * 0.03, fontWeight: 700,
-            color: isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.55)",
-            letterSpacing: 1.5, textTransform: "uppercase",
-          }}>{cta}</div>
-        )}
+          fontFamily: "Clash Display, sans-serif",
+          fontWeight: 700, color: "#fff", lineHeight: 1.05,
+          marginBottom: W * 0.03, textTransform: "uppercase", letterSpacing: -0.5, wordBreak: "break-word",
+        }}>{headline}</div>
+        {sub && <div style={{ fontSize: W * 0.032, color: "rgba(255,255,255,0.6)", lineHeight: 1.45, marginBottom: W * 0.04 }}>{sub}</div>}
+        <div style={{ fontSize: W * 0.027, fontWeight: 800, color: accentColor, letterSpacing: 2, textTransform: "uppercase" }}>→ {cta}</div>
       </div>
+      {handle && <div style={{ position: "absolute", bottom: W * 0.04, left: W * 0.11, fontSize: W * 0.023, color: "rgba(255,255,255,0.35)", letterSpacing: 1 }}>{handle}</div>}
     </div>
   );
 }
@@ -320,24 +281,16 @@ function isLightColor(hex) {
   return (r * 299 + g * 587 + b * 114) / 1000 > 145;
 }
 
-// Style variants for 3 different looks from same guide
+// Style variants — 3 layouts completamente diferentes
 function getVariantStyle(baseStyle, index) {
   if (!baseStyle) return null;
   const variants = [
-    { ...baseStyle }, // Original
-    { // Darker version
-      ...baseStyle,
-      bgColor: baseStyle.bgColorDark || "#1a1a1a",
-      textColor: "#ffffff",
-      overlayStyle: "bottom",
-    },
-    { // Accent version
-      ...baseStyle,
-      bgColor: baseStyle.bgColorAlt || "#0d0d0d",
-      textColor: "#ffffff",
-      accentColor: baseStyle.accentColor || "#ff5c28",
-      overlayStyle: "bottom",
-    },
+    // Layout 0: Full Bleed — estilo fiel à referência, foto preenche tudo
+    { ...baseStyle, layout: 0 },
+    // Layout 1: Split Panel — cor da referência no painel, foto à direita
+    { ...baseStyle, layout: 1 },
+    // Layout 2: Cinematic — fundo gerado pelo Gemini, foto lateral, texto dramático
+    { ...baseStyle, layout: 2, bgColor: "#000", textColor: "#fff" },
   ];
   return variants[index] || variants[0];
 }
@@ -358,7 +311,10 @@ function CreativeCard({ creative, index, styleGuide, onDownload, onDelete, onDup
   const previewRef = useRef();
   const varStyle = getVariantStyle(styleGuide, index);
   const variation = creative.variations?.[index];
+  const background = creative.backgrounds?.[index] || null;
   const fmt = FORMATS.find(f => f.id === format) || FORMATS[0];
+
+  const layoutNames = ["Full Bleed", "Split Panel", "Cinematic"];
 
   const handleDownload = async () => {
     if (!previewRef.current) return;
@@ -366,7 +322,7 @@ function CreativeCard({ creative, index, styleGuide, onDownload, onDelete, onDup
       const canvas = await html2canvas(previewRef.current, { scale: 3, useCORS: true, allowTaint: true });
       const a = document.createElement("a");
       a.href = canvas.toDataURL("image/png");
-      a.download = `${variation?.name || "criativo"}-${index + 1}.png`;
+      a.download = `${variation?.name || "criativo"}-v${index + 1}.png`;
       a.click();
     } catch (e) {
       onDownload(null, variation?.name);
@@ -377,9 +333,9 @@ function CreativeCard({ creative, index, styleGuide, onDownload, onDelete, onDup
     <div className="creative-card">
       <div className="creative-preview-wrap">
         <div ref={previewRef}>
-          <CreativeHTML data={creative} variation={variation} style={varStyle} format={format} />
+          <CreativeHTML data={creative} variation={variation} style={varStyle} format={format} background={background} />
         </div>
-        <div className="var-badge">Variação {index + 1}</div>
+        <div className="var-badge">{layoutNames[index] || `V${index + 1}`}</div>
       </div>
       <div className="creative-footer">
         <div>
@@ -516,38 +472,90 @@ Responda SOMENTE em JSON:
     }
   };
 
+  const generateBackground = async (prompt, aspectRatio) => {
+    try {
+      const res = await fetch(`${PROXY_URL}/api/gemini-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, aspectRatio }),
+      });
+      const data = await res.json();
+      const b64 = data.predictions?.[0]?.bytesBase64Encoded;
+      return b64 ? `data:image/png;base64,${b64}` : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const buildGeminiPrompts = (guide, fmt) => {
+    const aspectMap = { feed: "4:5", story: "9:16", square: "1:1" };
+    const ar = aspectMap[fmt] || "4:5";
+    const style = guide?.styleDescription || "professional advertising";
+    const accent = guide?.accentColor || "#ff5c28";
+    const bgColor = guide?.bgColor || "#f0ece4";
+
+    return [
+      // Variant 0 — Full Bleed: fiel ao estilo das referências, dramático no rodapé
+      {
+        prompt: `Stunning professional social media ad background, ${style} aesthetic, ${bgColor} color tones with ${accent} accent, photorealistic dramatic lighting fading to deep dark at the bottom 40%, high-end commercial photography, sharp ultra-detailed textures, no text, no people, no faces, 8k quality`,
+        aspectRatio: ar,
+      },
+      // Variant 1 — Split Panel: lado esquerdo limpo, lado direito vivo
+      {
+        prompt: `Professional advertising split composition, editorial lifestyle photography on the right side, clean elegant background on the left side, ${style} mood, warm cinematic tones matching ${bgColor}, luxury brand quality, magazine editorial aesthetics, no text, no people, no faces, ultra high resolution`,
+        aspectRatio: ar,
+      },
+      // Variant 2 — Cinematic: ambiente atmosférico e cinematográfico
+      {
+        prompt: `Dramatic cinematic advertising background, ${style} visual style, moody atmospheric lighting with ${accent} color accents, deep shadows and volumetric light rays, professional studio photography backdrop, ultra-luxury brand aesthetic, no text, no people, no faces, cinematic 4k quality`,
+        aspectRatio: ar,
+      },
+    ];
+  };
+
   const handleGenerate = async () => {
     if (!headline) return showToast("Preencha a headline!", "error");
     setGenerating(true);
     setProgress(0);
     try {
-      const steps = [
-        [20, "Analisando referências com Claude Vision..."],
-        [50, "Extraindo estilo visual..."],
-        [70, "Gerando variações de copy..."],
-        [90, "Montando os criativos..."],
-        [100, "Finalizando..."],
-      ];
-      let guide = null, copyData = null;
-      for (let i = 0; i < steps.length; i++) {
-        setProgress(steps[i][0]); setStep(steps[i][1]);
-        if (i === 0) { guide = await analyzeRefs(); if (guide) { setStyleGuide(guide); setStyleDesc(guide.styleDescription || ""); } }
-        else if (i === 2) { copyData = await generateCopy(guide); }
-        else await new Promise(r => setTimeout(r, 350));
-      }
-      if (!guide) {
-        guide = { bgColor: "#f0ece4", bgColorDark: "#1a1a1a", bgColorAlt: "#0d0d0d", textColor: "#111", accentColor: "#ff5c28", usesSerif: true, overlayStyle: "bottom", overlayStrength: 0.6, hasWatermark: false, hasDecorativeLine: false, ctaStyle: "text", handle: "", credential: "", styleDescription: "Editorial clean" };
+      // Step 1: Analisar referências
+      setProgress(15); setStep("Analisando referências com Claude Vision...");
+      let guide = await analyzeRefs();
+      if (guide) { setStyleGuide(guide); setStyleDesc(guide.styleDescription || ""); }
+      else {
+        guide = { bgColor: "#f0ece4", textColor: "#111", accentColor: "#ff5c28", usesSerif: true, overlayStyle: "bottom", hasWatermark: false, hasDecorativeLine: false, ctaStyle: "button", handle: "", credential: "", styleDescription: "Editorial clean" };
         setStyleGuide(guide);
       }
+
+      // Step 2: Gerar copy
+      setProgress(40); setStep("Gerando variações de copy com IA...");
+      const copyData = await generateCopy(guide);
+
+      // Step 3: Gerar backgrounds com Gemini Imagen 3 (em paralelo)
+      setProgress(60); setStep("Gerando 3 backgrounds únicos com Gemini Imagen 3...");
+      const prompts = buildGeminiPrompts(guide, format);
+      const backgrounds = await Promise.all(prompts.map(p => generateBackground(p.prompt, p.aspectRatio)));
+
+      setProgress(90); setStep("Montando os criativos...");
+      await new Promise(r => setTimeout(r, 300));
+
       const defaultVars = [
-        { name: "Urgência", headline, subheadline, cta: cta || "LEIA A LEGENDA", angle: "urgência" },
-        { name: "Benefício", headline, subheadline, cta: cta || "SAIBA MAIS", angle: "benefício" },
-        { name: "Curiosidade", headline, subheadline, cta: cta || "VER MAIS", angle: "curiosidade" },
+        { name: "Full Bleed", headline, subheadline, cta: cta || "LEIA A LEGENDA", angle: "urgência" },
+        { name: "Split Panel", headline, subheadline, cta: cta || "SAIBA MAIS", angle: "benefício" },
+        { name: "Cinematic", headline, subheadline, cta: cta || "VER MAIS", angle: "curiosidade" },
       ];
-      const creative = { headline, subheadline, cta, format, expertImage: expertPreview, variations: copyData?.variations || defaultVars, id: Date.now(), createdAt: new Date().toLocaleString("pt-BR") };
+      const creative = {
+        headline, subheadline, cta, format,
+        expertImage: expertPreview,
+        backgrounds,
+        variations: copyData?.variations || defaultVars,
+        id: Date.now(),
+        createdAt: new Date().toLocaleString("pt-BR"),
+      };
+      setProgress(100); setStep("Finalizando...");
       setCreatives([creative]);
       setLibrary(prev => [creative, ...prev]);
-      showToast("3 criativos gerados! 🎉");
+      showToast("3 criativos gerados com Gemini!");
     } catch (e) {
       showToast("Erro ao gerar. Tente novamente.", "error");
     } finally {
@@ -565,7 +573,7 @@ Responda SOMENTE em JSON:
       {generating && (
         <div className="overlay">
           <div className="overlay-logo">LaunchAds AI</div>
-          <p style={{ color: "var(--muted)", fontSize: 13 }}>Analisando referências e gerando criativos...</p>
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>Claude Vision + Gemini Imagen 3 trabalhando...</p>
           <div className="pbar"><div className="pfill" style={{ width: `${progress}%` }} /></div>
           <div className="pstep">{step}</div>
           <div style={{ fontSize: 11, color: "var(--border)" }}>{progress}%</div>
@@ -614,8 +622,13 @@ Responda SOMENTE em JSON:
                     <h3>✦ Gerador com Análise de Referências</h3>
                     <p>Suba referências — a IA detecta o estilo e replica nos seus criativos</p>
                   </div>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(255,92,40,.1)", color: "var(--accent)", border: "1px solid rgba(255,92,40,.2)" }}>
-                    <I d={ic.spark} size={12} /> Claude Vision
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(255,92,40,.1)", color: "var(--accent)", border: "1px solid rgba(255,92,40,.2)" }}>
+                      <I d={ic.spark} size={12} /> Claude Vision
+                    </div>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(66,133,244,.1)", color: "#4285f4", border: "1px solid rgba(66,133,244,.2)" }}>
+                      <I d={ic.spark} size={12} /> Gemini Imagen 3
+                    </div>
                   </div>
                 </div>
 

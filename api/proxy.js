@@ -25,7 +25,7 @@ app.post('/api/claude', async (req, res) => {
 
 app.post('/api/gemini-image', async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, aspectRatio = '4:5' } = req.body;
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${process.env.GEMINI_API_KEY}`,
       {
@@ -33,7 +33,7 @@ app.post('/api/gemini-image', async (req, res) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           instances: [{ prompt }],
-          parameters: { sampleCount: 1, aspectRatio: '4:5' },
+          parameters: { sampleCount: 1, aspectRatio },
         }),
       }
     );
