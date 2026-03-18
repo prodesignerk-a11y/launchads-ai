@@ -140,18 +140,29 @@ const ic = {
 };
 
 // ─── CREATIVE HTML RENDERER ───────────────────────────────────────────────────
+// Layout é controlado 100% pelos parâmetros extraídos das referências pelo Claude Vision.
+// As 3 variações seguem o mesmo layout base, diferindo só em paleta de cor.
 function CreativeHTML({ data, variation, style: S, format, background }) {
   const fmt = FORMATS.find(f => f.id === format) || FORMATS[0];
   const W = 340;
   const H = W * (fmt.h / fmt.w);
 
-  const bg = S?.bgColor || "#f0ece4";
-  const textColor = S?.textColor || "#111";
+  const bg = S?.bgColor || "#1a1a1a";
+  const textColor = S?.textColor || "#ffffff";
   const accentColor = S?.accentColor || "#ff5c28";
   const useSerif = S?.usesSerif !== false;
   const handle = S?.handle || "";
   const credential = S?.credential || "";
-  const layout = S?.layout || 0;
+  const accentIsLight = isLightColor(accentColor);
+  const isLight = isLightColor(bg);
+
+  // Parâmetros de layout extraídos das referências
+  const textPos = S?.textPosition || "bottom";       // "bottom" | "top" | "center-left"
+  const photoStyle = S?.photoStyle || "full-bleed";  // "full-bleed" | "right-side" | "left-side"
+  const overlayType = S?.overlayType || "gradient-bottom"; // "gradient-bottom" | "gradient-top" | "gradient-left" | "solid-panel" | "none"
+  const hasBand = S?.hasSolidTextBand || false;      // faixa sólida de cor para o texto
+  const bandPos = S?.textBandPosition || "bottom";   // "bottom" | "top"
+  const hasDecLine = S?.hasDecorativeLine || false;
 
   const headline = variation?.headline || data?.headline || "";
   const sub = variation?.subheadline || data?.subheadline || "";
@@ -160,115 +171,110 @@ function CreativeHTML({ data, variation, style: S, format, background }) {
 
   const headLen = headline.length;
   const headSize = headLen < 15 ? W * 0.085 : headLen < 25 ? W * 0.068 : headLen < 40 ? W * 0.056 : W * 0.046;
-  const isLight = isLightColor(bg);
-  const accentIsLight = isLightColor(accentColor);
 
-  // ── Layout 0: Full Bleed — foto cobre tudo, texto no rodapé ──────────────────
-  if (layout === 0) {
-    return (
-      <div style={{ width: W, height: H, position: "relative", overflow: "hidden", background: "#111", fontFamily: "Cabinet Grotesk, sans-serif" }}>
-        {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
-        {expertImage && <img src={expertImage} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />}
-        {/* Strong bottom gradient */}
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 0%, transparent 28%, rgba(0,0,0,0.6) 52%, rgba(0,0,0,0.93) 75%, #000 100%)" }} />
-        {/* Accent top bar */}
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${accentColor}, transparent)` }} />
-        {/* Handle top */}
-        {handle && <div style={{ position: "absolute", top: W * 0.05, left: W * 0.06, fontSize: W * 0.026, fontWeight: 700, color: "rgba(255,255,255,0.55)", letterSpacing: 0.5 }}>{handle}</div>}
-        {credential && <div style={{ position: "absolute", top: W * 0.05, right: W * 0.06, fontSize: W * 0.026, fontWeight: 700, color: accentColor, letterSpacing: 0.5 }}>{credential}</div>}
-        {/* Text block */}
-        <div style={{ position: "absolute", bottom: W * 0.06, left: 0, right: 0, padding: `0 ${W * 0.07}px` }}>
-          <div style={{ width: W * 0.1, height: 2, background: accentColor, marginBottom: W * 0.025 }} />
-          <div style={{
-            fontSize: headSize,
-            fontFamily: useSerif ? "Playfair Display, Georgia, serif" : "Clash Display, sans-serif",
-            fontWeight: 700, color: "#fff", lineHeight: 1.08,
-            marginBottom: W * 0.02, letterSpacing: -0.5, wordBreak: "break-word",
-          }}>
-            {useSerif ? headline.split(" ").map((w, i) => <span key={i} style={{ fontStyle: i % 3 === 2 ? "italic" : "normal" }}>{w} </span>) : headline}
-          </div>
-          {sub && <div style={{ fontSize: W * 0.034, color: "rgba(255,255,255,0.65)", marginBottom: W * 0.03, lineHeight: 1.4 }}>{sub}</div>}
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: W * 0.02,
-            padding: `${W * 0.022}px ${W * 0.045}px`, background: accentColor,
-            borderRadius: 4, fontSize: W * 0.027, fontWeight: 800,
-            color: accentIsLight ? "#000" : "#fff", letterSpacing: 1, textTransform: "uppercase",
-          }}>{cta}</div>
-        </div>
-      </div>
-    );
-  }
+  // Gradientes de overlay
+  const overlayGradients = {
+    "gradient-bottom": "linear-gradient(180deg, transparent 0%, transparent 30%, rgba(0,0,0,0.65) 55%, rgba(0,0,0,0.95) 80%, #000 100%)",
+    "gradient-top": "linear-gradient(180deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 35%, rgba(0,0,0,0.1) 60%, transparent 100%)",
+    "gradient-left": "linear-gradient(90deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 40%, rgba(0,0,0,0.2) 70%, transparent 100%)",
+    "none": "none",
+  };
 
-  // ── Layout 1: Split Panel — texto à esquerda, foto à direita ─────────────────
-  if (layout === 1) {
-    const panelBg = bg;
-    const panelText = textColor;
+  // Texto branco em overlays escuros, cor da referência em painéis sólidos
+  const onOverlay = "#ffffff";
+  const onPanel = textColor;
+
+  // Posição do bloco de texto
+  const textBlockStyle = () => {
+    if (textPos === "top") return { position: "absolute", top: W * 0.07, left: 0, right: 0, padding: `0 ${W * 0.07}px` };
+    if (textPos === "center-left") return { position: "absolute", top: "50%", transform: "translateY(-50%)", left: 0, width: "65%", padding: `0 ${W * 0.07}px` };
+    return { position: "absolute", bottom: W * 0.06, left: 0, right: 0, padding: `0 ${W * 0.07}px` }; // bottom default
+  };
+
+  const headlineColor = (overlayType === "solid-panel" || hasBand) ? onPanel : onOverlay;
+  const subColor = (overlayType === "solid-panel" || hasBand)
+    ? (isLight ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.65)")
+    : "rgba(255,255,255,0.7)";
+
+  // ── Layout: Split Panel (foto de um lado, painel de texto do outro) ────────────
+  if (photoStyle === "right-side" || photoStyle === "left-side") {
+    const photoOnRight = photoStyle === "right-side";
     return (
-      <div style={{ width: W, height: H, position: "relative", overflow: "hidden", display: "flex", fontFamily: "Cabinet Grotesk, sans-serif" }}>
-        {/* Left text panel */}
-        <div style={{ width: "46%", background: panelBg, position: "relative", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: `${W * 0.07}px ${W * 0.05}px ${W * 0.07}px ${W * 0.07}px`, zIndex: 2 }}>
-          {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.08 }} />}
+      <div style={{ width: W, height: H, position: "relative", overflow: "hidden", display: "flex", flexDirection: photoOnRight ? "row" : "row-reverse", fontFamily: "Cabinet Grotesk, sans-serif" }}>
+        {/* Color text panel */}
+        <div style={{ width: "46%", background: bg, position: "relative", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: `${W * 0.07}px ${W * 0.05}px ${W * 0.07}px ${W * 0.07}px`, zIndex: 2, flexShrink: 0 }}>
+          {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.07 }} />}
           <div>
-            {credential && <div style={{ fontSize: W * 0.024, fontWeight: 700, color: accentColor, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: W * 0.04 }}>{credential}</div>}
-            <div style={{ width: W * 0.07, height: 3, background: accentColor, marginBottom: W * 0.03 }} />
-            <div style={{
-              fontSize: headSize * 0.88,
-              fontFamily: useSerif ? "Playfair Display, serif" : "Clash Display, sans-serif",
-              fontWeight: 700, color: panelText, lineHeight: 1.1,
-              marginBottom: W * 0.025, wordBreak: "break-word",
-            }}>
+            {credential && <div style={{ fontSize: W * 0.024, fontWeight: 700, color: accentColor, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: W * 0.03 }}>{credential}</div>}
+            {hasDecLine && <div style={{ width: W * 0.07, height: 3, background: accentColor, marginBottom: W * 0.03 }} />}
+            <div style={{ fontSize: headSize * 0.88, fontFamily: useSerif ? "Playfair Display, serif" : "Clash Display, sans-serif", fontWeight: 700, color: onPanel, lineHeight: 1.1, marginBottom: W * 0.025, wordBreak: "break-word" }}>
               {useSerif ? headline.split(" ").map((w, i) => <span key={i} style={{ fontStyle: i % 3 === 2 ? "italic" : "normal" }}>{w} </span>) : headline}
             </div>
-            {sub && <div style={{ fontSize: W * 0.03, color: isLight ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)", lineHeight: 1.45, marginTop: W * 0.01 }}>{sub}</div>}
+            {sub && <div style={{ fontSize: W * 0.03, color: subColor, lineHeight: 1.45 }}>{sub}</div>}
           </div>
           <div>
             {handle && <div style={{ fontSize: W * 0.022, color: isLight ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.35)", marginBottom: W * 0.02 }}>{handle}</div>}
-            <div style={{
-              display: "inline-block", padding: `${W * 0.02}px ${W * 0.035}px`,
-              background: accentColor, borderRadius: 3,
-              fontSize: W * 0.024, fontWeight: 800, color: accentIsLight ? "#000" : "#fff",
-              letterSpacing: 1, textTransform: "uppercase",
-            }}>{cta}</div>
+            <div style={{ display: "inline-block", padding: `${W * 0.02}px ${W * 0.035}px`, background: accentColor, borderRadius: 3, fontSize: W * 0.024, fontWeight: 800, color: accentIsLight ? "#000" : "#fff", letterSpacing: 1, textTransform: "uppercase" }}>{cta}</div>
           </div>
         </div>
-        {/* Accent divider */}
+        {/* Divider */}
         <div style={{ width: 3, background: accentColor, flexShrink: 0, zIndex: 3 }} />
-        {/* Right photo panel */}
+        {/* Photo panel */}
         <div style={{ flex: 1, position: "relative" }}>
           {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
           {expertImage && <img src={expertImage} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />}
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(0,0,0,0.2) 0%, transparent 50%)" }} />
+          <div style={{ position: "absolute", inset: 0, background: photoOnRight ? "linear-gradient(90deg, rgba(0,0,0,0.18) 0%, transparent 40%)" : "linear-gradient(270deg, rgba(0,0,0,0.18) 0%, transparent 40%)" }} />
         </div>
       </div>
     );
   }
 
-  // ── Layout 2: Cinematic — fundo gerado, foto lateral, título central ──────────
+  // ── Layout: Full Bleed (foto preenche tudo) ───────────────────────────────────
   return (
-    <div style={{ width: W, height: H, position: "relative", overflow: "hidden", background: "#000", fontFamily: "Cabinet Grotesk, sans-serif" }}>
-      {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.65 }} />}
-      {expertImage && <img src={expertImage} alt="" style={{ position: "absolute", right: 0, bottom: 0, width: "60%", height: "90%", objectFit: "cover", objectPosition: "center top" }} />}
-      {/* Diagonal light fade from left */}
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(105deg, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.82) 38%, rgba(0,0,0,0.35) 65%, transparent 100%)" }} />
-      {/* Top/bottom vignette */}
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.55) 100%)" }} />
-      {/* Vertical accent line */}
-      <div style={{ position: "absolute", left: W * 0.07, top: H * 0.12, bottom: H * 0.12, width: 3, background: accentColor }} />
-      {/* Text — left side */}
-      <div style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", left: 0, padding: `0 ${W * 0.1}px 0 ${W * 0.11}px`, width: "68%" }}>
-        {credential && (
-          <div style={{ fontSize: W * 0.024, fontWeight: 700, color: accentColor, letterSpacing: 2, textTransform: "uppercase", marginBottom: W * 0.025 }}>{credential}</div>
-        )}
+    <div style={{ width: W, height: H, position: "relative", overflow: "hidden", background: bg, fontFamily: "Cabinet Grotesk, sans-serif" }}>
+      {/* Background gerado pelo Gemini */}
+      {background && <img src={background} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+      {/* Foto do expert */}
+      {expertImage && <img src={expertImage} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />}
+
+      {/* Overlay */}
+      {overlayType !== "none" && (
+        <div style={{ position: "absolute", inset: 0, background: overlayGradients[overlayType] || overlayGradients["gradient-bottom"] }} />
+      )}
+
+      {/* Faixa sólida de cor para texto */}
+      {hasBand && (
+        <div style={{
+          position: "absolute",
+          ...(bandPos === "top" ? { top: 0, left: 0, right: 0, height: "42%" } : { bottom: 0, left: 0, right: 0, height: "45%" }),
+          background: bg,
+          opacity: 0.93,
+        }} />
+      )}
+
+      {/* Barra de destaque no topo */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${accentColor}, transparent)` }} />
+
+      {/* Handle / Credential */}
+      <div style={{ position: "absolute", top: W * 0.05, left: W * 0.06, right: W * 0.06, display: "flex", justifyContent: "space-between" }}>
+        {handle && <span style={{ fontSize: W * 0.026, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: 0.5 }}>{handle}</span>}
+        {credential && <span style={{ fontSize: W * 0.026, fontWeight: 700, color: accentColor, letterSpacing: 0.5 }}>{credential}</span>}
+      </div>
+
+      {/* Bloco de texto */}
+      <div style={{ ...textBlockStyle(), zIndex: 2 }}>
+        {hasDecLine && <div style={{ width: W * 0.1, height: 2, background: accentColor, marginBottom: W * 0.025 }} />}
         <div style={{
           fontSize: headSize,
-          fontFamily: "Clash Display, sans-serif",
-          fontWeight: 700, color: "#fff", lineHeight: 1.05,
-          marginBottom: W * 0.03, textTransform: "uppercase", letterSpacing: -0.5, wordBreak: "break-word",
-        }}>{headline}</div>
-        {sub && <div style={{ fontSize: W * 0.032, color: "rgba(255,255,255,0.6)", lineHeight: 1.45, marginBottom: W * 0.04 }}>{sub}</div>}
-        <div style={{ fontSize: W * 0.027, fontWeight: 800, color: accentColor, letterSpacing: 2, textTransform: "uppercase" }}>→ {cta}</div>
+          fontFamily: useSerif ? "Playfair Display, Georgia, serif" : "Clash Display, sans-serif",
+          fontWeight: 700, color: headlineColor, lineHeight: 1.08,
+          marginBottom: W * 0.02, letterSpacing: -0.5, wordBreak: "break-word",
+        }}>
+          {useSerif ? headline.split(" ").map((w, i) => <span key={i} style={{ fontStyle: i % 3 === 2 ? "italic" : "normal" }}>{w} </span>) : headline}
+        </div>
+        {sub && <div style={{ fontSize: W * 0.034, color: subColor, marginBottom: W * 0.03, lineHeight: 1.4 }}>{sub}</div>}
+        <div style={{ display: "inline-flex", alignItems: "center", padding: `${W * 0.022}px ${W * 0.045}px`, background: accentColor, borderRadius: 4, fontSize: W * 0.027, fontWeight: 800, color: accentIsLight ? "#000" : "#fff", letterSpacing: 1, textTransform: "uppercase" }}>{cta}</div>
       </div>
-      {handle && <div style={{ position: "absolute", bottom: W * 0.04, left: W * 0.11, fontSize: W * 0.023, color: "rgba(255,255,255,0.35)", letterSpacing: 1 }}>{handle}</div>}
     </div>
   );
 }
@@ -281,18 +287,38 @@ function isLightColor(hex) {
   return (r * 299 + g * 587 + b * 114) / 1000 > 145;
 }
 
-// Style variants — 3 layouts completamente diferentes
+// 3 variações de paleta sobre o mesmo layout detectado das referências
 function getVariantStyle(baseStyle, index) {
-  if (!baseStyle) return null;
+  if (!baseStyle) return { ...defaultStyle };
   const variants = [
-    // Layout 0: Full Bleed — estilo fiel à referência, foto preenche tudo
-    { ...baseStyle, layout: 0 },
-    // Layout 1: Split Panel — cor da referência no painel, foto à direita
-    { ...baseStyle, layout: 1 },
-    // Layout 2: Cinematic — fundo gerado pelo Gemini, foto lateral, texto dramático
-    { ...baseStyle, layout: 2, bgColor: "#000", textColor: "#fff" },
+    // Variação 0: fiel às cores das referências
+    { ...baseStyle },
+    // Variação 1: versão escura/invertida do mesmo layout
+    {
+      ...baseStyle,
+      bgColor: isLightColor(baseStyle.bgColor || "#fff") ? "#111111" : lightenHex(baseStyle.bgColor || "#111", 60),
+      textColor: isLightColor(baseStyle.bgColor || "#fff") ? "#ffffff" : "#111111",
+    },
+    // Variação 2: accent em destaque no mesmo layout
+    {
+      ...baseStyle,
+      bgColor: baseStyle.accentColor || "#ff5c28",
+      textColor: isLightColor(baseStyle.accentColor || "#ff5c28") ? "#111111" : "#ffffff",
+      accentColor: isLightColor(baseStyle.bgColor || "#fff") ? "#111111" : "#ffffff",
+    },
   ];
   return variants[index] || variants[0];
+}
+
+const defaultStyle = { bgColor: "#1a1a1a", textColor: "#fff", accentColor: "#ff5c28", usesSerif: false, textPosition: "bottom", photoStyle: "full-bleed", overlayType: "gradient-bottom", hasSolidTextBand: false, textBandPosition: "bottom", hasDecorativeLine: false };
+
+function lightenHex(hex, amount) {
+  if (!hex?.startsWith("#")) return hex;
+  const num = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, (num >> 16) + amount);
+  const g = Math.min(255, ((num >> 8) & 0xff) + amount);
+  const b = Math.min(255, (num & 0xff) + amount);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
 }
 
 // ─── UPLOAD ZONE ──────────────────────────────────────────────────────────────
@@ -404,23 +430,29 @@ Analise PROFUNDAMENTE o estilo visual dessas referências de anúncio.
 
 Responda SOMENTE em JSON válido sem markdown:
 {
-  "bgColor": "#hex cor de fundo dominante",
+  "bgColor": "#hex cor de fundo dominante (painel de texto ou fundo sólido)",
   "textColor": "#hex cor principal do texto",
-  "accentColor": "#hex cor de destaque/CTA",
+  "accentColor": "#hex cor de destaque/CTA/linha decorativa",
   "usesSerif": true ou false,
-  "overlayStyle": "top" ou "bottom",
   "hasDecorativeLine": true ou false,
   "ctaStyle": "text" ou "button" ou "underline",
   "handle": "@handle se visível ou string vazia",
   "credential": "título/credencial se visível ou string vazia",
   "styleDescription": "descrição do estilo em português máx 100 chars",
-  "lightingStyle": "ex: studio soft-box, natural window light, dramatic low-key, golden hour, moody dark",
-  "photographyStyle": "ex: editorial portrait, lifestyle candid, studio product, fashion editorial, documentary",
-  "colorMood": "ex: warm earthy tones, cool blue-grays, high contrast monochrome, vibrant saturated, muted pastels",
-  "compositionStyle": "ex: centered portrait, rule of thirds, full bleed closeup, environmental wide shot",
-  "graphicElements": "descreva texturas, formas, overlays, gradientes visíveis nas referências em inglês",
-  "backgroundDescription": "descreva detalhadamente o fundo/ambiente das referências em inglês para usar como prompt de IA",
-  "overallMood": "ex: luxurious, energetic, calm authoritative, bold disruptive, elegant minimal"
+
+  "textPosition": "bottom" se o texto fica embaixo da foto | "top" se fica em cima | "center-left" se fica ao centro/esquerda sobre a foto",
+  "photoStyle": "full-bleed" se a foto preenche o card inteiro | "right-side" se a foto ocupa só o lado direito | "left-side" se ocupa só o lado esquerdo",
+  "overlayType": "gradient-bottom" se há gradiente escuro na parte inferior | "gradient-top" se o gradiente é no topo | "gradient-left" se o gradiente vem da esquerda para cobrir texto lateral | "solid-panel" se há um painel sólido de cor para o texto | "none" se não há overlay",
+  "hasSolidTextBand": true se há uma faixa/banner sólido de cor atrás do texto (não gradiente) | false caso contrário,
+  "textBandPosition": "bottom" ou "top" (só relevante se hasSolidTextBand for true),
+
+  "lightingStyle": "ex: studio soft-box, dramatic low-key, golden hour, moody dark",
+  "photographyStyle": "ex: editorial portrait, lifestyle candid, fashion editorial",
+  "colorMood": "ex: warm earthy tones, cool blue-grays, high contrast, vibrant saturated",
+  "compositionStyle": "ex: centered portrait, rule of thirds, full bleed closeup",
+  "graphicElements": "descreva texturas, formas, overlays visíveis em inglês",
+  "backgroundDescription": "descreva o fundo/ambiente detalhadamente em inglês para prompt de IA",
+  "overallMood": "ex: luxurious, energetic, bold disruptive, elegant minimal"
 }`,
               },
             ],
