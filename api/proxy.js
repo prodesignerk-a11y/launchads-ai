@@ -32,7 +32,7 @@ app.post('/api/generate-image', async (req, res) => {
     const response = await fetch('https://fal.run/fal-ai/flux/schnell', {
       method: 'POST',
       headers: {
-        'Authorization': `Key ${process.env.FAL_KEY}`,
+        'Authorization': `Key ${process.env.FAL_KEY?.trim()}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ prompt, image_size, num_inference_steps: 4, num_images: 1 }),
