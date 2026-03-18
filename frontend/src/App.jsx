@@ -478,30 +478,24 @@ Responda SOMENTE em JSON:
     }
   };
 
-  const generateBackground = async (prompt, aspectRatio) => {
+  const generateBackground = async (prompt, fmt) => {
     try {
-      const res = await fetch(`${PROXY_URL}/api/gemini-image`, {
+      const res = await fetch(`${PROXY_URL}/api/generate-image`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, aspectRatio }),
+        body: JSON.stringify({ prompt, format: fmt }),
       });
       const data = await res.json();
-      if (!data.predictions?.[0]?.bytesBase64Encoded) {
-        console.error("Gemini erro resposta:", JSON.stringify(data));
-      }
-      const b64 = data.predictions?.[0]?.bytesBase64Encoded;
-      return b64 ? `data:image/png;base64,${b64}` : null;
+      const url = data.images?.[0]?.url;
+      if (!url) console.error("fal.ai erro:", JSON.stringify(data));
+      return url || null;
     } catch (e) {
-      console.error("Gemini fetch error:", e);
+      console.error("fal.ai fetch error:", e);
       return null;
     }
   };
 
-  const buildGeminiPrompts = (guide, fmt) => {
-    const aspectMap = { feed: "4:5", story: "9:16", square: "1:1" };
-    const ar = aspectMap[fmt] || "4:5";
-
-    // Constrói o prompt base a partir dos campos extraídos pelo Claude
+  const buildImagePrompts = (guide, fmt) => {
     const parts = [
       guide?.backgroundDesc,
       guide?.lightingStyle && `${guide.lightingStyle} lighting`,
@@ -509,17 +503,17 @@ Responda SOMENTE em JSON:
       guide?.photographyStyle && `${guide.photographyStyle} style`,
       guide?.mood && `${guide.mood} mood`,
       "professional advertising background",
-      "no text, no people, no faces, ultra high quality, 8k",
+      "no text, no people, no faces, ultra high quality",
     ].filter(Boolean);
     const base = parts.join(", ");
     const accent = guide?.accentColor || "#ff5c28";
 
-    console.log("🎨 Gemini base prompt:", base);
+    console.log("🎨 Image base prompt:", base);
 
     return [
-      { prompt: base, aspectRatio: ar },
-      { prompt: `${base}, darker moodier version, deeper shadows, dramatic lighting`, aspectRatio: ar },
-      { prompt: `${base}, bold ${accent} color accent highlights, high contrast, vibrant`, aspectRatio: ar },
+      { prompt: base, fmt },
+      { prompt: `${base}, darker moodier version, deeper shadows, dramatic cinematic lighting`, fmt },
+      { prompt: `${base}, bold ${accent} color accent highlights, high contrast, vibrant energy`, fmt },
     ];
   };
 
@@ -554,11 +548,11 @@ Responda SOMENTE em JSON:
 
       // Step 3: Gerar backgrounds com Gemini Imagen 3 (em paralelo)
       setProgress(60); setStep("Gerando 3 backgrounds únicos com Gemini Imagen 3...");
-      const prompts = buildGeminiPrompts(guide, format);
-      console.log("🎨 Prompts enviados ao Gemini:", prompts.map(p => p.prompt));
+      const prompts = buildImagePrompts(guide, format);
+      console.log("🎨 Prompts enviados ao fal.ai:", prompts.map(p => p.prompt));
 
       const backgrounds = await Promise.all(prompts.map(async (p, i) => {
-        const result = await generateBackground(p.prompt, p.aspectRatio);
+        const result = await generateBackground(p.prompt, p.fmt);
         console.log(`🖼️ Gemini variação ${i + 1}:`, result ? "✅ imagem gerada" : "❌ falhou/null");
         return result;
       }));
@@ -583,8 +577,8 @@ Responda SOMENTE em JSON:
       setCreatives([creative]);
       setLibrary(prev => [creative, ...prev]);
 
-      const geminiOk = backgrounds.filter(Boolean).length;
-      showToast(geminiOk > 0 ? `${geminiOk}/3 backgrounds Gemini gerados!` : "Gemini falhou — verifique a API key", geminiOk > 0 ? "success" : "error");
+      const imgsOk = backgrounds.filter(Boolean).length;
+      showToast(imgsOk > 0 ? `${imgsOk}/3 backgrounds gerados com FLUX!` : "Geração de imagem falhou — verifique a FAL_KEY", imgsOk > 0 ? "success" : "error");
     } catch (e) {
       console.error("❌ Erro handleGenerate:", e);
       showToast(`Erro: ${e.message}`, "error");
@@ -656,8 +650,8 @@ Responda SOMENTE em JSON:
                     <div style={{ display: "flex", gap: 6, alignItems: "center", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(255,92,40,.1)", color: "var(--accent)", border: "1px solid rgba(255,92,40,.2)" }}>
                       <I d={ic.spark} size={12} /> Claude Vision
                     </div>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(66,133,244,.1)", color: "#4285f4", border: "1px solid rgba(66,133,244,.2)" }}>
-                      <I d={ic.spark} size={12} /> Gemini Imagen 3
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: "rgba(139,92,246,.1)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,.2)" }}>
+                      <I d={ic.spark} size={12} /> FLUX Schnell
                     </div>
                   </div>
                 </div>

@@ -23,20 +23,20 @@ app.post('/api/claude', async (req, res) => {
   }
 });
 
-app.post('/api/gemini-image', async (req, res) => {
+app.post('/api/generate-image', async (req, res) => {
   try {
-    const { prompt, aspectRatio = '4:5' } = req.body;
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instances: [{ prompt }],
-          parameters: { sampleCount: 1, aspectRatio },
-        }),
-      }
-    );
+    const { prompt, format = 'feed' } = req.body;
+    const sizeMap = { feed: 'portrait_4_3', story: 'portrait_16_9', square: 'square_hd' };
+    const image_size = sizeMap[format] || 'portrait_4_3';
+
+    const response = await fetch('https://fal.run/fal-ai/flux/schnell', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Key ${process.env.FAL_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt, image_size, num_inference_steps: 4, num_images: 1 }),
+    });
     const data = await response.json();
     res.json(data);
   } catch (err) {
@@ -47,7 +47,7 @@ app.post('/api/gemini-image', async (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({
     anthropic: process.env.ANTHROPIC_API_KEY ? '✅ configurada' : '❌ FALTANDO',
-    gemini:    process.env.GEMINI_API_KEY    ? '✅ configurada' : '❌ FALTANDO',
+    fal:       process.env.FAL_KEY           ? '✅ configurada' : '❌ FALTANDO',
   });
 });
 
