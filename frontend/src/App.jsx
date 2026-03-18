@@ -428,7 +428,9 @@ Rules:
       });
 
       const data = await res.json();
+      console.log("🔍 Claude resposta bruta:", JSON.stringify(data).slice(0, 500));
       const text = data.content?.find(b => b.type === "text")?.text || "{}";
+      console.log("🔍 Texto extraído:", text.slice(0, 300));
       const guide = JSON.parse(text.replace(/```json|```/g, "").trim());
       console.log("✅ Guide extraído:", guide);
       return guide;
