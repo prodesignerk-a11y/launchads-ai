@@ -379,53 +379,59 @@ export default function LaunchAdsAI() {
     try {
       const imgs = references.slice(0, 3).map(r => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: r.base64 } }));
 
-      // Chamada 1: extrai layout e cores em JSON simples e confiável
-      const resLayout = await fetch(`${PROXY_URL}/api/claude`, {
+      const res = await fetch(`${PROXY_URL}/api/claude`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 800,
+          max_tokens: 900,
           messages: [{
             role: "user",
             content: [
               ...imgs,
               {
                 type: "text",
-                text: `Analise essas referências de anúncio. Responda SOMENTE com JSON válido, sem markdown, sem texto fora do JSON:
-{"bgColor":"#hex","textColor":"#hex","accentColor":"#hex","usesSerif":true,"hasDecorativeLine":false,"ctaStyle":"button","handle":"","credential":"","styleDescription":"max 80 chars","textPosition":"bottom","photoOnSide":false,"photoSide":"right","overlayGradient":"bottom","hasSolidBand":false}`,
+                text: `Analyze these ad reference images and return ONLY valid JSON. Replace each example value with what you actually observe:
+
+{
+  "bgColor": "#1a1a1a",
+  "textColor": "#ffffff",
+  "accentColor": "#ff5c28",
+  "usesSerif": false,
+  "hasDecorativeLine": true,
+  "ctaStyle": "button",
+  "handle": "@username or empty string",
+  "credential": "Expert Title or empty string",
+  "styleDescription": "Dark editorial with orange accents",
+  "textPosition": "bottom",
+  "photoOnSide": false,
+  "photoSide": "right",
+  "overlayGradient": "bottom",
+  "hasSolidBand": false,
+  "lightingStyle": "dramatic studio low-key",
+  "colorMood": "dark monochrome with orange accents",
+  "photographyStyle": "editorial portrait",
+  "backgroundDesc": "dark textured studio background with subtle depth",
+  "mood": "luxurious authoritative"
+}
+
+Rules:
+- textPosition: "bottom" if text is in lower area, "top" if upper area
+- photoOnSide: true only if photo occupies just one half of the card
+- overlayGradient: "bottom", "top", or "none"
+- hasSolidBand: true only if there is a solid color block behind the text
+- All descriptive fields (lightingStyle, colorMood, photographyStyle, backgroundDesc, mood) must be in English`,
               },
             ],
           }],
         }),
       });
-      const layoutData = await resLayout.json();
-      const layoutText = layoutData.content?.find(b => b.type === "text")?.text || "{}";
-      const guide = JSON.parse(layoutText.replace(/```json|```/g, "").trim());
 
-      // Chamada 2: gera o prompt do Gemini como texto puro (sem JSON, sem aspas problemáticas)
-      const resPrompt = await fetch(`${PROXY_URL}/api/claude`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 400,
-          messages: [{
-            role: "user",
-            content: [
-              ...imgs,
-              {
-                type: "text",
-                text: `You are an expert at writing Gemini Imagen 3 prompts. Based on these reference ad images, write ONE detailed image generation prompt in English that will produce a background image matching this visual style. Describe: the background environment, lighting style, color palette, textures, mood, and photographic style. Do NOT include people, faces, or text in the prompt. Write ONLY the prompt, no explanations, no quotes around it.`,
-              },
-            ],
-          }],
-        }),
-      });
-      const promptData = await resPrompt.json();
-      const geminiPromptBase = promptData.content?.find(b => b.type === "text")?.text?.trim() || null;
-
-      return { ...guide, geminiPromptBase };
+      const data = await res.json();
+      const text = data.content?.find(b => b.type === "text")?.text || "{}";
+      const guide = JSON.parse(text.replace(/```json|```/g, "").trim());
+      console.log("✅ Guide extraído:", guide);
+      return guide;
     } catch (e) {
       console.error("analyzeRefs error:", e);
       return null;
@@ -494,17 +500,26 @@ Responda SOMENTE em JSON:
   const buildGeminiPrompts = (guide, fmt) => {
     const aspectMap = { feed: "4:5", story: "9:16", square: "1:1" };
     const ar = aspectMap[fmt] || "4:5";
-    const base = guide?.geminiPromptBase || "professional advertising background, high-end commercial photography, no text, no people, no faces";
+
+    // Constrói o prompt base a partir dos campos extraídos pelo Claude
+    const parts = [
+      guide?.backgroundDesc,
+      guide?.lightingStyle && `${guide.lightingStyle} lighting`,
+      guide?.colorMood && `${guide.colorMood} color palette`,
+      guide?.photographyStyle && `${guide.photographyStyle} style`,
+      guide?.mood && `${guide.mood} mood`,
+      "professional advertising background",
+      "no text, no people, no faces, ultra high quality, 8k",
+    ].filter(Boolean);
+    const base = parts.join(", ");
     const accent = guide?.accentColor || "#ff5c28";
-    const bgColor = guide?.bgColor || "#1a1a1a";
+
+    console.log("🎨 Gemini base prompt:", base);
 
     return [
-      // Variação 0: fiel ao estilo das referências
-      { prompt: `${base}, no text, no people, no faces, ultra high quality, 8k`, aspectRatio: ar },
-      // Variação 1: mesma composição, mais escura e dramática
-      { prompt: `${base}, darker moodier version, deeper shadows, richer dark tones, dramatic lighting, no text, no people, no faces, 8k`, aspectRatio: ar },
-      // Variação 2: mesma composição, destaque na cor de accent
-      { prompt: `${base}, with bold ${accent} color accent highlights and glows, high contrast, vibrant punch, same composition style, no text, no people, no faces, 8k`, aspectRatio: ar },
+      { prompt: base, aspectRatio: ar },
+      { prompt: `${base}, darker moodier version, deeper shadows, dramatic lighting`, aspectRatio: ar },
+      { prompt: `${base}, bold ${accent} color accent highlights, high contrast, vibrant`, aspectRatio: ar },
     ];
   };
 
