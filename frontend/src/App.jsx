@@ -392,32 +392,35 @@ export default function LaunchAdsAI() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
+          max_tokens: 1800,
           messages: [{
             role: "user",
             content: [
               ...imgs,
               {
                 type: "text",
-                text: `Você é especialista em design de criativos para tráfego pago.
-Analise DETALHADAMENTE o estilo visual dessas referências.
+                text: `Você é especialista em design de criativos para tráfego pago e prompt engineering para Gemini Imagen 3.
+Analise PROFUNDAMENTE o estilo visual dessas referências de anúncio.
 
 Responda SOMENTE em JSON válido sem markdown:
 {
   "bgColor": "#hex cor de fundo dominante",
-  "bgColorDark": "#hex versão escura do fundo",
-  "bgColorAlt": "#hex cor alternativa de fundo",
   "textColor": "#hex cor principal do texto",
-  "accentColor": "#hex cor de destaque",
+  "accentColor": "#hex cor de destaque/CTA",
   "usesSerif": true ou false,
-  "overlayStyle": "top" ou "bottom" (onde fica a área de texto?),
-  "overlayStrength": 0.0 a 0.9,
-  "hasWatermark": true ou false (tem texto repetido pequeno?),
-  "hasDecorativeLine": true ou false (tem linha decorativa?),
+  "overlayStyle": "top" ou "bottom",
+  "hasDecorativeLine": true ou false,
   "ctaStyle": "text" ou "button" ou "underline",
   "handle": "@handle se visível ou string vazia",
-  "credential": "título se visível ou string vazia",
-  "styleDescription": "descrição curta do estilo em português máx 80 chars"
+  "credential": "título/credencial se visível ou string vazia",
+  "styleDescription": "descrição do estilo em português máx 100 chars",
+  "lightingStyle": "ex: studio soft-box, natural window light, dramatic low-key, golden hour, moody dark",
+  "photographyStyle": "ex: editorial portrait, lifestyle candid, studio product, fashion editorial, documentary",
+  "colorMood": "ex: warm earthy tones, cool blue-grays, high contrast monochrome, vibrant saturated, muted pastels",
+  "compositionStyle": "ex: centered portrait, rule of thirds, full bleed closeup, environmental wide shot",
+  "graphicElements": "descreva texturas, formas, overlays, gradientes visíveis nas referências em inglês",
+  "backgroundDescription": "descreva detalhadamente o fundo/ambiente das referências em inglês para usar como prompt de IA",
+  "overallMood": "ex: luxurious, energetic, calm authoritative, bold disruptive, elegant minimal"
 }`,
               },
             ],
@@ -490,24 +493,31 @@ Responda SOMENTE em JSON:
   const buildGeminiPrompts = (guide, fmt) => {
     const aspectMap = { feed: "4:5", story: "9:16", square: "1:1" };
     const ar = aspectMap[fmt] || "4:5";
-    const style = guide?.styleDescription || "professional advertising";
+
+    const bg = guide?.backgroundDescription || "professional advertising background";
+    const lighting = guide?.lightingStyle || "professional studio lighting";
+    const photo = guide?.photographyStyle || "editorial photography";
+    const colorMood = guide?.colorMood || "professional color tones";
+    const composition = guide?.compositionStyle || "balanced composition";
+    const elements = guide?.graphicElements || "clean minimal graphic elements";
+    const mood = guide?.overallMood || "professional";
     const accent = guide?.accentColor || "#ff5c28";
-    const bgColor = guide?.bgColor || "#f0ece4";
+    const base = `${bg}, ${lighting}, ${colorMood}, ${photo} style, ${elements}, ${mood} mood, no text, no people, no faces, ultra-high quality advertising photography, 8k sharp`;
 
     return [
-      // Variant 0 — Full Bleed: fiel ao estilo das referências, dramático no rodapé
+      // Variant 0 — Full Bleed: fiel à referência, escurece no rodapé para o texto
       {
-        prompt: `Stunning professional social media ad background, ${style} aesthetic, ${bgColor} color tones with ${accent} accent, photorealistic dramatic lighting fading to deep dark at the bottom 40%, high-end commercial photography, sharp ultra-detailed textures, no text, no people, no faces, 8k quality`,
+        prompt: `${base}, ${composition}, gradient darkening toward the bottom third for text overlay, faithful to reference style`,
         aspectRatio: ar,
       },
-      // Variant 1 — Split Panel: lado esquerdo limpo, lado direito vivo
+      // Variant 1 — Split Panel: lado direito vivo, esquerdo mais limpo
       {
-        prompt: `Professional advertising split composition, editorial lifestyle photography on the right side, clean elegant background on the left side, ${style} mood, warm cinematic tones matching ${bgColor}, luxury brand quality, magazine editorial aesthetics, no text, no people, no faces, ultra high resolution`,
+        prompt: `${base}, split scene — rich detailed environment on the right half, clean minimal ${guide?.bgColor || "neutral"} toned background on the left half, editorial split layout, magazine quality`,
         aspectRatio: ar,
       },
-      // Variant 2 — Cinematic: ambiente atmosférico e cinematográfico
+      // Variant 2 — Cinematic: mais dramático com a cor de destaque
       {
-        prompt: `Dramatic cinematic advertising background, ${style} visual style, moody atmospheric lighting with ${accent} color accents, deep shadows and volumetric light rays, professional studio photography backdrop, ultra-luxury brand aesthetic, no text, no people, no faces, cinematic 4k quality`,
+        prompt: `${base}, dramatic cinematic reinterpretation, deep shadows, ${accent} color accent glow, volumetric atmospheric light, high contrast, luxury brand campaign aesthetic`,
         aspectRatio: ar,
       },
     ];
