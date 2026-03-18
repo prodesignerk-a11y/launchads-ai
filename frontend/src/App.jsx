@@ -159,7 +159,7 @@ function CreativeHTML({ data, variation, style: S, format, background }) {
   const expertImage = data?.expertImage;
 
   const headLen = headline.length;
-  const headSize = headLen < 15 ? W * 0.11 : headLen < 25 ? W * 0.088 : headLen < 40 ? W * 0.072 : W * 0.058;
+  const headSize = headLen < 15 ? W * 0.085 : headLen < 25 ? W * 0.068 : headLen < 40 ? W * 0.056 : W * 0.046;
   const isLight = isLightColor(bg);
   const accentIsLight = isLightColor(accentColor);
 
